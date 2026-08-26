@@ -55,10 +55,16 @@ wheel（Phase 4 的 setup 脚本负责）。克隆后第一件事是 `pytest` �
 
 ## Windows（4080 Super）使用流程
 
-1. `git clone` 本仓库，装环境、跑 `pytest`；
-2. 把 CRSP 快照文件夹（`crsp_ciz_YYYY-MM-DD_...`，整个目录）拷到本地盘；
-3. `configs/local.yaml` 里写 `paths.snapshot_dir` 指向该快照；
-4. 后续阶段（Kronos 训练/推理）的 CUDA 环境与运行步骤见 RUNBOOK（Phase 4 加入）。
+全部步骤见 [RUNBOOK_WINDOWS.md](RUNBOOK_WINDOWS.md)。一句话版：
+
+```powershell
+git clone --recurse-submodules https://github.com/ysuu525/us-quant-pipeline.git
+cd us-quant-pipeline
+powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
+```
+
+脚本自动完成 venv、CUDA torch、依赖、CUDA 自检、pytest、训练冒烟；之后
+按 RUNBOOK 配置数据路径开训。
 
 ## 尚未落地 / 待真实数据核对的口径
 
@@ -86,5 +92,5 @@ wheel（Phase 4 的 setup 脚本负责）。克隆后第一件事是 `pytest` �
 - [x] Phase 1 数据层与标签层（§2–§5、§7、§9）+ 合成数据测试
 - [x] Phase 2 评估与成本模块（§7.5、§8、§1 自建归因因子）
 - [x] Phase 3 Kronos 微调接入（§6 + 预注册 v1）+ Mac 冒烟
-- [ ] Phase 4 Windows 部署材料（CUDA 环境、RUNBOOK）
+- [x] Phase 4 Windows 部署材料（setup_windows.ps1、RUNBOOK_WINDOWS.md）
 - [ ] Phase 5 真实数据核对（coverage audit §10、双路复权验证、golden fixtures）
