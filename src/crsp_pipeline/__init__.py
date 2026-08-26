@@ -7,8 +7,18 @@
 - adjust    事件累计复权 + DlyFacPrc 双路验证（§5）
 - cleaning  BA 统计、lookback 缺口排除（§9）
 - splits    walk-forward + purge 断言 + 封存 OOS（§7）
+- factors   自建归因因子 + beta/波动率暴露（§1/§7.5）
+- signal_eval    信号层评估：RankIC / NW t / 十分位价差 / 中性化（§7.5）
+- costs     分段成本模型 + 通道预设（§8）
+- execution_sim  执行层模拟 + Monte Carlo 选择噪声带（§7.5/§8）
 """
 
-from . import adjust, calendar, cleaning, config, labels, splits, universe  # noqa: F401
+from . import (  # noqa: F401
+    adjust, calendar, cleaning, config, costs, execution_sim, factors,
+    labels, signal_eval, splits, universe,
+)
 
-__all__ = ["adjust", "calendar", "cleaning", "config", "labels", "splits", "universe"]
+__all__ = [
+    "adjust", "calendar", "cleaning", "config", "costs", "execution_sim",
+    "factors", "labels", "signal_eval", "splits", "universe",
+]

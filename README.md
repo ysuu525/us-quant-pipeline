@@ -18,6 +18,10 @@ src/crsp_pipeline/     管线代码
   adjust.py              事件累计复权 + DlyFacPrc 双路验证（§5）
   cleaning.py            BA 统计、lookback 缺口排除（§9）
   splits.py              walk-forward + purge 断言 + 封存 OOS（§7）
+  factors.py             自建归因因子 + beta/波动率暴露（§1/§7.5）
+  signal_eval.py         信号层：RankIC / Newey-West / 十分位价差 / 中性化 + 冻结通过标准（§7.5）
+  costs.py               分段成本模型、通道预设、监管过手费、滑点档（§8）
+  execution_sim.py       执行层：缓冲区替换模拟 + Monte Carlo 选择噪声带（§7.5/§8）
 configs/               default.yaml 模板；本机路径写 local.yaml（不进 git）
 tests/                 合成数据单元测试（标签 golden case、purge off-by-one 等）
 ```
@@ -31,7 +35,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-克隆后第一件事是跑 `pytest`——37 个测试全绿才继续。逻辑问题在 Mac 上修，
+克隆后第一件事是跑 `pytest`——64 个测试全绿才继续。逻辑问题在 Mac 上修，
 不在训练机上调试。
 
 ## Windows（4080 Super）使用流程
@@ -54,13 +58,18 @@ pytest
 - 上市日：`universe.liquidity_flags` 目前用面板首行近似，接入
   `stksecurityinfohist` 后改传 `first_trade_dates`；
 - 退市终值记录的 `DlyClose` 是否即终值（退市恰发生在 t+1 时首日段的口径），
-  用 §10 Lehman 2008 golden fixture 核对。
+  用 §10 Lehman 2008 golden fixture 核对；
+- 监管过手费（SEC fee / FINRA TAF）默认值为公开档位，开户后按账户后台
+  费率表原文重配 `costs.RegulatoryFees` 与通道 `FeeSchedule`（§8 行动项）；
+- 执行层时序近似：模拟按「t+1 交易日边界成交、买入腿享当日 close-to-close
+  收益」处理，open 与前收的隔夜差并入滑点档；Phase 5 接真实 `DlyOpen` 精化
+  并量化与 §4 标签的口径差。
 
 ## 阶段进度
 
 - [x] Phase 0 仓库骨架 / 配置
 - [x] Phase 1 数据层与标签层（§2–§5、§7、§9）+ 合成数据测试
-- [ ] Phase 2 评估与成本模块（§7.5、§8、§1 自建归因因子）
+- [x] Phase 2 评估与成本模块（§7.5、§8、§1 自建归因因子）
 - [ ] Phase 3 Kronos 微调接入（§6）+ Mac 冒烟
 - [ ] Phase 4 Windows 部署材料（CUDA 环境、RUNBOOK）
 - [ ] Phase 5 真实数据核对（coverage audit §10、双路复权验证、golden fixtures）
