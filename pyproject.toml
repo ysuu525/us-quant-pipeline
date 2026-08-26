@@ -13,6 +13,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 download = ["wrds"]
+# 训练/推理依赖。torch 需按平台装：Mac 直接 pip install torch（MPS/CPU）；
+# Windows 用 CUDA wheel（见 setup_windows.ps1 / RUNBOOK）。
+train = ["torch>=2.2", "einops>=0.8", "huggingface_hub>=0.30", "safetensors>=0.4", "tqdm"]
 
 [build-system]
 requires = ["setuptools>=68"]

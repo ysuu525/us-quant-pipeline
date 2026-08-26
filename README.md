@@ -22,21 +22,36 @@ src/crsp_pipeline/     管线代码
   signal_eval.py         信号层：RankIC / Newey-West / 十分位价差 / 中性化 + 冻结通过标准（§7.5）
   costs.py               分段成本模型、通道预设、监管过手费、滑点档（§8）
   execution_sim.py       执行层：缓冲区替换模拟 + Monte Carlo 选择噪声带（§7.5/§8）
-configs/               default.yaml 模板；本机路径写 local.yaml（不进 git）
+src/kronos_ft/         Kronos 微调层（§6 + docs/预注册_v1.md）
+  windows.py             训练/推理窗口索引 + 内层验证切分（purge 同 §7）
+  dataset.py             官方归一化契约的 torch Dataset
+  models.py              预训练加载 / 冒烟小模型 / SWA 权重平均 / device 降级
+  train.py               单卡两阶段微调：内层 loss 早停 + SWA-3 + 登记簿 + --smoke
+  infer.py               多路径采样打分：score = predOpen(t+6)/predOpen(t+1) − 1
+third_party/kronos/    官方仓库 submodule（钉死 commit，不改动）
+configs/               default.yaml / experiment.yaml 模板；本机路径写 local.yaml（不进 git）
 tests/                 合成数据单元测试（标签 golden case、purge off-by-one 等）
 ```
 
 ## 环境（Mac / Windows 通用）
 
-Python ≥ 3.10：
+Python ≥ 3.10。克隆要带 submodule：
 
 ```bash
-pip install -e ".[dev]"
-pytest
+git clone --recurse-submodules https://github.com/ysuu525/us-quant-pipeline.git
 ```
 
-克隆后第一件事是跑 `pytest`——64 个测试全绿才继续。逻辑问题在 Mac 上修，
-不在训练机上调试。
+（已克隆的补一句 `git submodule update --init`。）然后：
+
+```bash
+pip install -e ".[dev,train]"
+pytest
+python -m kronos_ft.train --smoke
+```
+
+torch 按平台装：Mac 直接 `pip install torch`（MPS/CPU）；Windows 用 CUDA
+wheel（Phase 4 的 setup 脚本负责）。克隆后第一件事是 `pytest` 全绿 +
+冒烟 PASS 才继续。逻辑问题在 Mac 上修，不在训练机上调试。
 
 ## Windows（4080 Super）使用流程
 
@@ -70,6 +85,6 @@ pytest
 - [x] Phase 0 仓库骨架 / 配置
 - [x] Phase 1 数据层与标签层（§2–§5、§7、§9）+ 合成数据测试
 - [x] Phase 2 评估与成本模块（§7.5、§8、§1 自建归因因子）
-- [ ] Phase 3 Kronos 微调接入（§6）+ Mac 冒烟
+- [x] Phase 3 Kronos 微调接入（§6 + 预注册 v1）+ Mac 冒烟
 - [ ] Phase 4 Windows 部署材料（CUDA 环境、RUNBOOK）
 - [ ] Phase 5 真实数据核对（coverage audit §10、双路复权验证、golden fixtures）

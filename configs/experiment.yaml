@@ -1,0 +1,25 @@
+# Kronos 微调实验配置（对应 docs/预注册_v1.md；改动任何已冻结项须记入登记簿）
+
+pretrained:
+  tokenizer: "NeoQuasar/Kronos-Tokenizer-base"
+  predictor: "NeoQuasar/Kronos-small"
+
+ablation:
+  lookbacks: [60, 90, 200, 400]      # §6：400+6+1=407 ≤ 512
+  seeds: [0, 1, 2]                   # 预注册 §1.3：每配置 3 seeds
+  coarse_screen_folds: 4             # 预注册 §2：粗筛用最早 4 折
+
+training:
+  predict: 6
+  batch_size: 32
+  max_epochs: 30
+  patience: 5
+  swa_k: 3                           # 预注册 §1.2
+  inner_months: 6                    # 预注册 §1.1
+  num_workers: 0                     # Windows 上按需调大
+
+sampling:                            # 官方 backtest 参数（finetune/config.py）
+  T: 0.6
+  top_p: 0.9
+  top_k: 0
+  sample_count: 5
