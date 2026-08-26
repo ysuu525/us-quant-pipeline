@@ -1,0 +1,35 @@
+# 默认配置模板。本机差异（数据路径等）写 configs/local.yaml 覆盖，local.yaml 不进 git。
+# 所有参数对应 docs/美股DL量化管线规范_v1.3.md 的章节号。
+
+paths:
+  # CRSP 快照根目录（crsp_download.py 的 --out 目录下那个快照文件夹）
+  snapshot_dir: "REPLACE_ME/crsp_ciz_YYYY-MM-DD_..."
+  output_dir: "./outputs"
+
+snapshot:
+  # §11 可复现性冻结：实验引用快照 ID；加载时与 metadata/snapshot_manifest.json 核对
+  snapshot_id: null
+
+universe:  # §2
+  min_price: 5.0
+  adv_window: 20
+  adv_min_valid_obs: 15
+  adv_min_dollar: 5.0e6
+  min_listed_sessions: 120
+  top_n_by_cap: 1500
+
+label:  # §4
+  predict_window: 6            # t+1 open 建仓, t+6 open 退出
+  # Shumway 插补敏感性档位（业绩类退市且 DlyRet 缺失时使用；两档都要跑，报告 ±档位）
+  delist_imputation_levels: [-0.30, -0.55]
+
+splits:  # §7
+  train_years: 3
+  val_months: 6
+  step_months: 6
+  label_horizon: 6             # purge 用，按交易日历显式 +6
+  oos_start: null              # 封存 OOS 起点（最后 ≥2 年），冻结前禁止查看
+
+adjust:  # §5
+  # 复权锚定基准日（固定，不用「最新日」这种会漂移的说法）
+  anchor_date: null

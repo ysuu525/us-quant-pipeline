@@ -1,0 +1,3 @@
+wrds>=3.2
+pandas>=2.0
+pyarrow>=14.0

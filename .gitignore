@@ -1,0 +1,38 @@
+# --- 数据与产物：绝不进 git（CRSP 授权数据 + 体积） ---
+crsp_ciz_snapshots/
+data/
+snapshots/
+*.parquet
+*.feather
+*.h5
+checkpoints/
+runs/
+outputs/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
+# --- 凭据 ---
+.pgpass
+.env
+*.secret
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- OS / 编辑器 ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- 本机覆盖配置（模板 configs/default.yaml 进 git，本机实际路径不进） ---
+configs/local.yaml

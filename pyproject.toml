@@ -1,0 +1,26 @@
+[project]
+name = "crsp-pipeline"
+version = "0.1.0"
+description = "美股 DL 量化管线（规范 v1.3）：CRSP CIZ 数据层 / 标签引擎 / 评估 / Kronos 微调"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "pyarrow>=14",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+download = ["wrds"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
