@@ -110,7 +110,7 @@ def main():
     ap.add_argument("--cache-root", default="outputs/repr_cache")
     ap.add_argument("--pool", default="mean", choices=["last", "mean"])
     ap.add_argument("--lookback", type=int, default=90)
-    ap.add_argument("--alphas", default="1e3,1e4,1e5,1e6")
+    ap.add_argument("--alphas", default="1e6,1e7,3e7,1e8,3e8,1e9,1e10")
     ap.add_argument("--out-json", default="outputs/ridge_probe.json")
     args = ap.parse_args()
 
@@ -137,22 +137,48 @@ def main():
         m_va, E_va = block(P, cal, adj, uni_all, args.lookback, vs, ve, tok, mdl,
                            args.pool, croot / f"{name}_val")
         del adj
-        Xtr, _, ytr = prep(m_tr, E_tr)
+        Xtr, dtr, ytr = prep(m_tr, E_tr)
         Xva, dva, yva = prep(m_va, E_va)
         log(f"  样本 训练 {len(Xtr):,} / 验证 {len(Xva):,}")
-        best = None
+
+        # alpha 必须在**内层**验证上选：训练窗尾部 inner_months 个月，
+        # 与内层训练按 predict+1 日 purge。在外层验证窗上选 alpha 等于在考卷上
+        # 调参，会系统性虚高（fold40 诊断即犯此错，此处修正）。
+        anchors = m_tr.loc[((m_tr["status"] == "ok") & m_tr["label"].notna()).to_numpy(),
+                           "signal_date"].reset_index(drop=True)
+        inner_start = cal.snap_forward(anchors.max() - pd.DateOffset(months=6))
+        inner_cut = cal.shift(inner_start, -7)
+        d_in = (anchors >= inner_start).to_numpy()
+        d_out = (anchors <= inner_cut).to_numpy()
+        log(f"  内层选参窗 [{inner_start.date()}..{anchors.max().date()}]，"
+            f"内层训练截至 {inner_cut.date()}")
+
+        picked, best_inner = None, -np.inf
         for a in alphas:
-            p = ridge(Xtr, ytr, Xva, a)
-            ic, t, nd = daily_ic(p, yva, dva)
-            log(f"  alpha={a:>8.0e}: RankIC {ic:+.5f}  t {t:+.2f}  ({nd} 天)")
-            if best is None or ic > best[1]:
-                best = (a, ic, t, nd)
-        results[name] = {"alpha": best[0], "rank_ic": best[1], "t": best[2],
-                         "n_days": best[3], "pool": args.pool}
+            p_in = ridge(Xtr[d_out], ytr[d_out], Xtr[d_in], a)
+            ic_in, _, _ = daily_ic(p_in, ytr[d_in], dtr[d_in])
+            p_out = ridge(Xtr, ytr, Xva, a)
+            ic_out, t_out, nd = daily_ic(p_out, yva, dva)
+            mark = ""
+            if ic_in > best_inner:
+                best_inner, picked = ic_in, (a, ic_out, t_out, nd)
+                mark = "  << 内层最优"
+            log(f"  alpha={a:>8.0e}: 内层 {ic_in:+.5f} | 外层 {ic_out:+.5f} "
+                f"(t {t_out:+.2f}){mark}")
+        oracle = max(
+            (daily_ic(ridge(Xtr, ytr, Xva, a), yva, dva)[0] for a in alphas))
+        results[name] = {"alpha": picked[0], "rank_ic": picked[1], "t": picked[2],
+                         "n_days": picked[3], "pool": args.pool,
+                         "inner_rank_ic": float(best_inner),
+                         "oracle_rank_ic": float(oracle)}
+        log(f"  → 选定 alpha={picked[0]:.0e}：外层 RankIC {picked[1]:+.5f} "
+            f"(t {picked[2]:+.2f})　[事后最优上界 {oracle:+.5f}]")
         del Xtr, Xva, E_tr, E_va, m_tr, m_va
 
     vals = [r["rank_ic"] for r in results.values()]
+    orc = [r["oracle_rank_ic"] for r in results.values()]
     results["_summary"] = {"mean_rank_ic": float(np.mean(vals)),
+                           "mean_oracle_rank_ic": float(np.mean(orc)),
                            "n_positive": int(sum(v > 0 for v in vals)),
                            "n_folds": len(vals), "pool": args.pool}
     Path(args.out_json).write_text(json.dumps(results, indent=2, ensure_ascii=False),
