@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "experiment_id": "gbdt_strong_jkp_v1",
+  "as_of_date": "2026-08-31",
+  "sealed_raw_data_cutoff": "2023-12-29",
+  "frozen_label_artifact_exception": {
+    "enabled": true,
+    "reason": "The mandated fold42 official labels are pre-existing frozen artifacts whose t+6 exits extend to 2024-01-09. Reuse them for an apples-to-apples comparison, but do not read new CRSP or JKP rows after 2023-12-29."
+  },
+  "models": [
+    "lightgbm",
+    "xgboost",
+    "catboost"
+  ],
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "tuning_seed": 20260831,
+  "num_threads": 6,
+  "max_rss_gb": 8.0,
+  "features": {
+    "stock_features": "the existing 26 price/volume features, built before the point-in-time universe filter and then ranked cross-sectionally by date",
+    "price_source": "panel_kronos_adj.parquet; DlyRet and DlyCap come from panel_raw.parquet",
+    "jkp_source": "F:/quant/external/jkp/usa_all_factors_daily_vw_cap.csv",
+    "jkp_series": 153,
+    "jkp_windows": [
+      5,
+      20,
+      60
+    ],
+    "jkp_lag_observations": 1,
+    "jkp_formula": "expm1(rolling_sum(log1p(ret.shift(1))))",
+    "jkp_cross_sectional_rank": false,
+    "jkp_fill": "none"
+  },
+  "training_label": {
+    "kind": "six-market-session compounded CRSP DlyRet, cross-sectionally demeaned",
+    "horizon": 6,
+    "construction_order": "build on the unfiltered stock history, require exact consecutive market-session positions, then apply the universe anchor filter",
+    "purge": "require label_end_date strictly before each inner or outer validation start"
+  },
+  "inner_validation": {
+    "tail_trading_days": 126,
+    "tune_max_stocks_per_day": 384,
+    "selection_metric": "mean daily cross-sectional RankIC",
+    "selection_scope": "independent within each outer fold",
+    "tie_break": "fewer boosting rounds, then lower structural complexity"
+  },
+  "round_checkpoints": [
+    300,
+    700
+  ],
+  "grids": {
+    "lightgbm": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "num_leaves": [
+        31,
+        127
+      ],
+      "min_data_in_leaf": [
+        250,
+        1000
+      ]
+    },
+    "xgboost": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "max_depth": [
+        4,
+        8
+      ],
+      "min_child_weight": [
+        50,
+        250
+      ]
+    },
+    "catboost": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "depth": [
+        6,
+        8
+      ],
+      "l2_leaf_reg": [
+        3.0,
+        10.0
+      ]
+    }
+  },
+  "final_fit": {
+    "hyperparameters": "one inner-selected configuration per model and outer fold, fixed across all final seeds",
+    "primary_prediction": "arithmetic mean of the three seed predictions for each stock-date key",
+    "seed_dispersion": "standard deviation of the three seed-level 881-day mean RankIC values"
+  },
+  "evaluation": {
+    "folds": [
+      "fold36",
+      "fold37",
+      "fold38",
+      "fold39",
+      "fold40",
+      "fold41",
+      "fold42"
+    ],
+    "expected_daily_ic_count": 881,
+    "labels": "outputs/foldNN_lb90_s0_poolB_universe/eval_amp_lb90_foldNN/labels.parquet",
+    "primary_metric": "mean of all 881 concatenated daily RankIC values",
+    "secondary_metrics": [
+      "Newey-West t-statistic with lag 5",
+      "simple mean of seven fold RankIC values",
+      "number of positive folds",
+      "per-seed primary-metric mean and standard deviation"
+    ],
+    "kronos_reference_rank_ic": 0.02066796,
+    "decision_thresholds": [
+      {
+        "upper_exclusive": 0.01,
+        "conclusion": "Kronos clearly wins"
+      },
+      {
+        "lower_inclusive": 0.01,
+        "upper_inclusive": 0.02,
+        "conclusion": "Kronos leads, but not decisively"
+      },
+      {
+        "lower_exclusive": 0.02,
+        "conclusion": "The tree model matches or beats Kronos"
+      }
+    ]
+  },
+  "compute": {
+    "device": "CPU only",
+    "min_available_ram_gb_before_fold": 10.0,
+    "materialization": "date-filtered base cache plus one fold at a time; JKP state columns are expanded into the dense matrix in row chunks",
+    "resume": true
+  }
+}
