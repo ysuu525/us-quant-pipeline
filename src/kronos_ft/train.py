@@ -30,10 +30,16 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from crsp_pipeline.calendar import TradingCalendar
+from crsp_pipeline.cleaning import quality_ok_mask
 
 from .dataset import KronosWindowDataset
 from .models import build_tiny, load_pretrained, pick_device, swa_average
-from .windows import build_window_index, filter_anchors, inner_split
+from .windows import (
+    build_window_index,
+    filter_anchors,
+    filter_index_by_universe,
+    inner_split,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LEDGER_PATH = REPO_ROOT / "experiments" / "ledger.md"
@@ -44,9 +50,15 @@ class TrainConfig:
     lookback: int = 90
     predict: int = 6
     clip: float = 5.0
-    batch_size: int = 32
+    batch_size: int = 50   # 官方 finetune/config.py 默认（2026-08-27 从 32 对齐）
     max_epochs: int = 30
     patience: int = 5          # 内层 loss 连续 patience 个 epoch 未创新低 → 停
+    # 官方 finetune/config.py：每 epoch 抽 n_train_iter=2000*batch /
+    # n_val_iter=400*batch 个样本（有放回，seed+epoch 播种）。真实数据一折
+    # ~350 万窗口，全量枚举 27 分钟/epoch 不可行（2026-08-27 实测）。
+    n_train_batches: int = 2000
+    n_val_batches: int = 400
+    full_epoch: bool = False   # True = 回到全量枚举（合成数据/小池调试用）
     swa_k: int = 3             # 预注册：最优 epoch 前最后 K 个 ckpt 权重平均
     inner_months: int = 6      # 预注册：内层验证窗
     seed: int = 0
@@ -73,6 +85,10 @@ def set_seed(seed: int) -> None:
 
 
 def _make_loader(ds, cfg: TrainConfig, shuffle: bool) -> DataLoader:
+    if cfg.num_workers > 0 and getattr(ds, "samples_per_epoch", None) is not None:
+        # 官方式抽样的 rng 在 Dataset 对象里；多 worker 会各持一份相同副本，
+        # 抽出重复样本且 set_epoch_seed 不再生效。需要 worker 感知播种才能开。
+        raise ValueError("num_workers>0 与抽样模式不兼容（rng 会被 worker 复制）")
     g = torch.Generator()
     g.manual_seed(cfg.seed)
     return DataLoader(ds, batch_size=cfg.batch_size, shuffle=shuffle,
@@ -80,10 +96,16 @@ def _make_loader(ds, cfg: TrainConfig, shuffle: bool) -> DataLoader:
                       drop_last=shuffle)
 
 
-def _stage_loss(stage: str, model, tokenizer, x, stamp):
-    """官方目标函数，逐行对应 train_tokenizer.py / train_predictor.py。"""
+def _stage_loss(stage: str, model, tokenizer, x, stamp, training: bool = True):
+    """官方目标函数，逐行对应 train_tokenizer.py / train_predictor.py。
+
+    tokenizer 阶段训练与验证口径不同（官方如此）：训练 =
+    (mse(z_pre,x)+mse(z,x)+bsq)/2；**验证只看 mse(z, x)**
+    （train_tokenizer.py 验证循环）。predictor 阶段两者同为 compute_loss。"""
     if stage == "tokenizer":
         (z_pre, z), bsq_loss, _, _ = model(x)
+        if not training:
+            return F.mse_loss(z, x)
         recon = F.mse_loss(z_pre, x) + F.mse_loss(z, x)
         return (recon + bsq_loss) / 2
     with torch.no_grad():
@@ -102,7 +124,7 @@ def _epoch(stage, model, tokenizer, loader, device, cfg,
     with ctx:
         for x, stamp in loader:
             x, stamp = x.to(device), stamp.to(device)
-            loss = _stage_loss(stage, model, tokenizer, x, stamp)
+            loss = _stage_loss(stage, model, tokenizer, x, stamp, training)
             if training:
                 optimizer.zero_grad()
                 loss.backward()
@@ -115,9 +137,25 @@ def _epoch(stage, model, tokenizer, loader, device, cfg,
     return float(np.mean(losses)) if losses else float("nan")
 
 
+def _resume_key(stage: str, cfg: TrainConfig, n_train: int, n_inner: int) -> dict:
+    """续训状态的配置指纹：任何一项不同即拒绝续训（防跨配置误接）。"""
+    return {"stage": stage, "lookback": cfg.lookback, "predict": cfg.predict,
+            "seed": cfg.seed, "batch_size": cfg.batch_size,
+            "max_epochs": cfg.max_epochs, "n_train_batches": cfg.n_train_batches,
+            "n_val_batches": cfg.n_val_batches, "full_epoch": cfg.full_epoch,
+            "n_train_ds": n_train, "n_inner_ds": n_inner}
+
+
 def train_stage(stage: str, model, tokenizer, train_ds, inner_ds,
                 cfg: TrainConfig, out_dir: Path) -> dict:
     """一个阶段的完整训练：早停（内层 loss）→ SWA → save_pretrained。
+
+    断点续训（2026-08-27）：每 epoch 在模型 checkpoint 之外另存
+    ``{stage}_resume_state.pt``（优化器/调度器/最优记录/torch RNG 状态）；
+    中断后重跑同一命令自动从下一 epoch 接续，**逐位一致**（抽样由
+    set_epoch_seed 按 epoch 重播，dropout 等由 RNG 状态恢复；逐位一致
+    仅限默认抽样模式——枚举模式下 DataLoader 洗牌顺序不恢复，续训仍
+    正确但批顺序不同）。阶段正常完成后状态文件自动删除，重跑即全新开始。
 
     返回 {best_epoch, stopped_epoch, best_inner_loss, swa_inner_loss, history}。
     """
@@ -146,7 +184,34 @@ def train_stage(stage: str, model, tokenizer, train_ds, inner_ds,
 
     history, ckpts = [], {}
     best_epoch, best_inner = 0, float("inf")
-    for epoch in range(1, cfg.max_epochs + 1):
+    start_epoch = 1
+    state_path = out_dir / f"{stage}_resume_state.pt"
+    key = _resume_key(stage, cfg, len(train_ds), len(inner_ds))
+    if state_path.exists():
+        st = torch.load(state_path, weights_only=False)
+        if st.get("key") == key:
+            last = st["epoch"]
+            model.load_state_dict(
+                torch.load(out_dir / f"{stage}_epoch{last:03d}.pt", weights_only=True))
+            model.to(device)
+            optimizer.load_state_dict(st["optimizer"])
+            scheduler.load_state_dict(st["scheduler"])
+            history = st["history"]
+            best_epoch, best_inner = st["best_epoch"], st["best_inner"]
+            torch.set_rng_state(st["rng_cpu"])
+            if torch.cuda.is_available() and st.get("rng_cuda") is not None:
+                torch.cuda.set_rng_state_all(st["rng_cuda"])
+            ckpts = {e: out_dir / f"{stage}_epoch{e:03d}.pt" for e in range(1, last + 1)}
+            start_epoch = last + 1
+            print(f"[{stage}] resume from epoch {last} (best {best_epoch})", flush=True)
+        else:
+            print(f"[{stage}] resume state config mismatch -> fresh start", flush=True)
+
+    for epoch in range(start_epoch, cfg.max_epochs + 1):
+        # 官方契约：训练侧每 epoch 换抽样种子；内层验证侧固定同一子集，
+        # 使早停指标逐 epoch 可比（对官方的唯一刻意偏离，见 dataset.py）。
+        train_ds.set_epoch_seed(epoch)
+        inner_ds.set_epoch_seed(0)
         train_loss = _epoch(stage, model, tokenizer, train_loader, device, cfg,
                             optimizer, scheduler)
         inner_loss = _epoch(stage, model, tokenizer, inner_loader, device, cfg)
@@ -155,11 +220,20 @@ def train_stage(stage: str, model, tokenizer, train_ds, inner_ds,
         ckpt_path = out_dir / f"{stage}_epoch{epoch:03d}.pt"
         torch.save({k: v.cpu() for k, v in model.state_dict().items()}, ckpt_path)
         ckpts[epoch] = ckpt_path
-        print(f"[{stage}] epoch {epoch}: train {train_loss:.4f}  inner {inner_loss:.4f}")
+        print(f"[{stage}] epoch {epoch}: train {train_loss:.4f}  inner {inner_loss:.4f}",
+              flush=True)
 
-        if inner_loss < best_inner:
+        improved = inner_loss < best_inner
+        if improved:
             best_inner, best_epoch = inner_loss, epoch
-        elif epoch - best_epoch >= cfg.patience:
+        torch.save({
+            "key": key, "epoch": epoch, "history": history,
+            "best_epoch": best_epoch, "best_inner": best_inner,
+            "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
+            "rng_cpu": torch.get_rng_state(),
+            "rng_cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+        }, state_path)
+        if not improved and epoch - best_epoch >= cfg.patience:
             print(f"[{stage}] early stop at epoch {epoch} (best {best_epoch})")
             break
 
@@ -169,6 +243,7 @@ def train_stage(stage: str, model, tokenizer, train_ds, inner_ds,
     sds = [torch.load(ckpts[e], weights_only=True) for e in swa_epochs]
     model.load_state_dict(swa_average(sds))
     model.to(device)
+    inner_ds.set_epoch_seed(0)   # SWA 评估用同一内层子集，与逐 epoch 指标可比
     swa_inner = _epoch(stage, model, tokenizer, inner_loader, device, cfg)
 
     final_dir = out_dir / f"{stage}_final"
@@ -181,17 +256,54 @@ def train_stage(stage: str, model, tokenizer, train_ds, inner_ds,
         "final_dir": str(final_dir),
     }
     (out_dir / f"{stage}_summary.json").write_text(json.dumps(summary, indent=2))
+    state_path.unlink(missing_ok=True)   # 阶段完成 → 清除续训状态，重跑即全新
     return summary
+
+
+def _load_or_build_index(panel, calendar, cfg: TrainConfig, quality_filter: bool,
+                         index_cache: Path | None) -> pd.DataFrame:
+    """窗口索引缓存：同一（lookback × predict × 池）的全区间索引跨 seed/折复用。
+
+    缓存的是 filter_anchors **之前**的全区间索引，折切分与 universe 过滤
+    在其后进行，因此同一 lookback+池 的缓存可服务全部折与 seed。sidecar
+    meta（含 panel 行数）不匹配即重建，防止面板更换后吃到陈旧缓存。"""
+    meta = {"lookback": cfg.lookback, "predict": cfg.predict,
+            "quality_filter": bool(quality_filter), "panel_rows": int(len(panel))}
+    if index_cache is not None and index_cache.exists():
+        sidecar = index_cache.with_suffix(".meta.json")
+        if sidecar.exists() and json.loads(sidecar.read_text(encoding="utf-8")) == meta:
+            idx = pd.read_parquet(index_cache)
+            for c in ("anchor", "start", "end"):
+                idx[c] = pd.to_datetime(idx[c])
+            print(f"index cache hit: {index_cache} ({len(idx):,} windows)", flush=True)
+            return idx
+        print("index cache meta mismatch -> rebuild", flush=True)
+    extra = quality_ok_mask(panel) if quality_filter else None
+    idx = build_window_index(panel, calendar, cfg.lookback, cfg.predict,
+                             extra_valid=extra)
+    if index_cache is not None:
+        index_cache.parent.mkdir(parents=True, exist_ok=True)
+        idx.to_parquet(index_cache, index=False)
+        index_cache.with_suffix(".meta.json").write_text(
+            json.dumps(meta), encoding="utf-8")
+        print(f"index cache saved: {index_cache}", flush=True)
+    return idx
 
 
 def run(panel: pd.DataFrame, calendar: TradingCalendar, train_start, train_end,
         cfg: TrainConfig, out_dir: Path, stage: str = "both",
         pretrained: tuple[str, str] | None = None, tiny: bool = False,
-        ledger: bool = True) -> dict:
+        ledger: bool = True, universe: pd.DataFrame | None = None,
+        quality_filter: bool = False, index_cache: Path | None = None) -> dict:
     """一折 × 一 seed × 一 lookback 的完整微调入口。
 
     pretrained = (tokenizer_path, predictor_path)，HF id 或本地目录；
     tiny=True 用随机初始化小模型（冒烟）。
+
+    训练池消融（2026-08-27，登记簿有记录）：universe 传 universe.parquet
+    的 DataFrame → 只用 anchor 在 §2 universe 内的窗口（B 臂）；
+    quality_filter=True → Kronos Appendix B 式行级质量过滤（C 臂）。
+    两者均不改变默认行为（A 臂 = 全量池）。
     """
     set_seed(cfg.seed)
     if tiny:
@@ -201,35 +313,68 @@ def run(panel: pd.DataFrame, calendar: TradingCalendar, train_start, train_end,
             raise ValueError("pretrained paths required unless tiny=True")
         tokenizer, model = load_pretrained(*pretrained)
 
-    index = build_window_index(panel, calendar, cfg.lookback, cfg.predict)
+    index = _load_or_build_index(panel, calendar, cfg, quality_filter, index_cache)
     index = filter_anchors(index, train_start, train_end)
+    if universe is not None:
+        n_before = len(index)
+        index = filter_index_by_universe(index, universe)
+        print(f"universe filter: {n_before:,} -> {len(index):,} windows", flush=True)
     tr_idx, iv_idx = inner_split(index, calendar, cfg.inner_months, cfg.predict)
     if len(tr_idx) == 0 or len(iv_idx) == 0:
         raise ValueError(
             f"empty split: {len(tr_idx)} train / {len(iv_idx)} inner-val windows"
         )
     print(f"windows: {len(tr_idx)} train / {len(iv_idx)} inner-val "
-          f"(lookback={cfg.lookback}, predict={cfg.predict}, seed={cfg.seed})")
+          f"(lookback={cfg.lookback}, predict={cfg.predict}, seed={cfg.seed})",
+          flush=True)
 
-    def _ds(idx):
+    def _ds(idx, n_batches):
+        spe = None if cfg.full_epoch else n_batches * cfg.batch_size
         return KronosWindowDataset(panel, idx, calendar, cfg.lookback,
-                                   cfg.predict, cfg.clip)
+                                   cfg.predict, cfg.clip,
+                                   samples_per_epoch=spe, seed=cfg.seed)
 
-    train_ds, inner_ds = _ds(tr_idx), _ds(iv_idx)
+    train_ds = _ds(tr_idx, cfg.n_train_batches)
+    inner_ds = _ds(iv_idx, cfg.n_val_batches)
+    if not cfg.full_epoch:
+        print(f"sampling: {len(train_ds):,} train / {len(inner_ds):,} inner "
+              f"samples per epoch (official n_iter contract)", flush=True)
     results = {"config": asdict(cfg), "n_train": len(tr_idx), "n_inner": len(iv_idx)}
 
+    def _completed(name: str) -> bool:
+        return ((out_dir / f"{name}_final").exists()
+                and (out_dir / f"{name}_summary.json").exists())
+
     if stage in ("tokenizer", "both"):
-        results["tokenizer"] = train_stage("tokenizer", tokenizer, None,
-                                           train_ds, inner_ds, cfg, out_dir)
+        if _completed("tokenizer"):
+            # 崩溃自愈：已完成阶段跳过重训（想重训请换 --out 或删产物）
+            print("[tokenizer] 已完成（发现 tokenizer_final + summary）→ 跳过，"
+                  "复用产物", flush=True)
+            results["tokenizer"] = json.loads(
+                (out_dir / "tokenizer_summary.json").read_text())
+            from .models import import_kronos
+            KronosTokenizer, _, _ = import_kronos()
+            tokenizer = KronosTokenizer.from_pretrained(
+                str(out_dir / "tokenizer_final"))
+        else:
+            results["tokenizer"] = train_stage("tokenizer", tokenizer, None,
+                                               train_ds, inner_ds, cfg, out_dir)
     if stage in ("predictor", "both"):
-        results["predictor"] = train_stage("predictor", model, tokenizer,
-                                           train_ds, inner_ds, cfg, out_dir)
+        if _completed("predictor"):
+            print("[predictor] 已完成（发现 predictor_final + summary）→ 跳过，"
+                  "复用产物", flush=True)
+            results["predictor"] = json.loads(
+                (out_dir / "predictor_summary.json").read_text())
+        else:
+            results["predictor"] = train_stage("predictor", model, tokenizer,
+                                               train_ds, inner_ds, cfg, out_dir)
 
     if ledger:
         best = {k: round(v["best_inner_loss"], 5) for k, v in results.items()
                 if isinstance(v, dict) and "best_inner_loss" in v}
+        pool = "universe" if universe is not None else ("quality" if quality_filter else "full")
         append_ledger(
-            f"train | stage={stage} lookback={cfg.lookback} seed={cfg.seed} "
+            f"train | stage={stage} lookback={cfg.lookback} seed={cfg.seed} pool={pool} "
             f"window=[{pd.Timestamp(train_start).date()}..{pd.Timestamp(train_end).date()}] "
             f"best_inner={best} out={out_dir}"
         )
@@ -294,8 +439,22 @@ def main() -> None:
     ap.add_argument("--pretrained-tokenizer", default="NeoQuasar/Kronos-Tokenizer-base")
     ap.add_argument("--pretrained-predictor", default="NeoQuasar/Kronos-small")
     ap.add_argument("--out", default="outputs/run")
-    ap.add_argument("--batch-size", type=int, default=32)
+    ap.add_argument("--batch-size", type=int, default=50)
     ap.add_argument("--max-epochs", type=int, default=30)
+    ap.add_argument("--n-train-batches", type=int, default=2000,
+                    help="每 epoch 训练批数（官方 n_train_iter/batch）")
+    ap.add_argument("--n-val-batches", type=int, default=400,
+                    help="每 epoch 内层验证批数（官方 n_val_iter/batch）")
+    ap.add_argument("--full-epoch", action="store_true",
+                    help="全量枚举（不抽样；大池上极慢，仅调试）")
+    ap.add_argument("--universe-parquet", default=None,
+                    help="训练池消融 B 臂：universe.parquet 路径，"
+                         "只用 anchor 在 §2 universe 内的窗口")
+    ap.add_argument("--quality-filter", action="store_true",
+                    help="训练池消融 C 臂：Kronos Appendix B 式行级质量过滤")
+    ap.add_argument("--index-cache", default=None,
+                    help="窗口索引缓存 parquet 路径（同 lookback×池 跨 seed/折复用，"
+                         "省约 10 分钟/次；面板更换后自动失效重建）")
     args = ap.parse_args()
 
     if args.smoke:
@@ -309,10 +468,16 @@ def main() -> None:
     date_col = "caldt" if "caldt" in idx_df.columns else idx_df.columns[0]
     cal = TradingCalendar.from_market_index(idx_df, date_col)
     cfg = TrainConfig(lookback=args.lookback, seed=args.seed,
-                      batch_size=args.batch_size, max_epochs=args.max_epochs)
+                      batch_size=args.batch_size, max_epochs=args.max_epochs,
+                      n_train_batches=args.n_train_batches,
+                      n_val_batches=args.n_val_batches,
+                      full_epoch=args.full_epoch)
+    universe = pd.read_parquet(args.universe_parquet) if args.universe_parquet else None
     run(panel, cal, args.train_start, args.train_end, cfg, Path(args.out),
         stage=args.stage,
-        pretrained=(args.pretrained_tokenizer, args.pretrained_predictor))
+        pretrained=(args.pretrained_tokenizer, args.pretrained_predictor),
+        universe=universe, quality_filter=args.quality_filter,
+        index_cache=Path(args.index_cache) if args.index_cache else None)
 
 
 if __name__ == "__main__":

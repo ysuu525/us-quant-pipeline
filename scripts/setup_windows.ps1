@@ -1,4 +1,4 @@
-# Windows (4080 Super) 一键环境搭建。在仓库根目录用 PowerShell 运行：
+﻿# Windows (4080 Super) 一键环境搭建。在仓库根目录用 PowerShell 运行：
 #   powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 # 幂等：重复运行安全。
 

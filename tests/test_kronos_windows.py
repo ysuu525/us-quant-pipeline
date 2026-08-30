@@ -79,3 +79,41 @@ def test_scoring_index_lookback_only(cal):
     # 只要 lookback 侧连续：20 − 10 + 1 = 11 个 anchor，最后一个是末日
     assert len(idx) == 11
     assert idx["anchor"].iloc[-1] == cal.dates[19]
+
+
+def test_extra_valid_excludes_windows(cal):
+    import numpy as np
+    import pandas as pd
+    from kronos_ft.windows import build_window_index
+    n, L, P = 30, 8, 4
+    close = np.linspace(10, 12, n)
+    p = pd.DataFrame({
+        "PERMNO": 1, "DlyCalDt": cal.dates[:n], "DlyOpen": close, "DlyHigh": close * 1.01,
+        "DlyLow": close * 0.99, "DlyClose": close, "DlyVol": 1e5, "DlyPrcVol": close * 1e5,
+    })
+    base = build_window_index(p, cal, L, P)
+    extra = pd.Series(True, index=p.index)
+    extra.iloc[15] = False
+    filtered = build_window_index(p, cal, L, P, extra_valid=extra)
+    # 覆盖第 15 行的窗口全部消失
+    assert len(filtered) < len(base)
+    d15 = pd.Timestamp(cal.dates[15])
+    assert not ((filtered["start"] <= d15) & (filtered["end"] >= d15)).any()
+
+
+def test_filter_index_by_universe(cal):
+    import pandas as pd
+    from kronos_ft.windows import filter_index_by_universe
+    idx = pd.DataFrame({
+        "PERMNO": [1, 1, 2],
+        "anchor": [cal.dates[10], cal.dates[11], cal.dates[10]],
+        "start": [cal.dates[3]] * 3, "end": [cal.dates[14]] * 3,
+    })
+    uni = pd.DataFrame({
+        "PERMNO": [1, 1, 2],
+        "DlyCalDt": [cal.dates[10], cal.dates[11], cal.dates[10]],
+        "in_universe": [True, False, False],
+    })
+    out = filter_index_by_universe(idx, uni)
+    assert len(out) == 1
+    assert out["PERMNO"].iloc[0] == 1 and out["anchor"].iloc[0] == cal.dates[10]

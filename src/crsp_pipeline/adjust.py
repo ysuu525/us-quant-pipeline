@@ -4,11 +4,12 @@
 （anchor）为锚的累计复权因子；禁止逐日裸乘 ``DlyFacPrc``。
 
 - Kronos 蜡烛复权只处理拆股与股票股利；现金股息、分拆、配股不写入 OHLC。
-  事件的筛选（哪些 CIZ 事件码算拆股/股票股利）由调用方完成——具体码表
-  待真实数据核对后冻结，本模块只接收已筛好的事件表。
-- ``DlyFacPrc`` 的语义（当期事件因子 vs 累计因子）待真实数据验证：
-  用 ``dual_path_report`` 在 AAPL 2020-08-31、NVDA 2024-06-10 拆股上双路
-  对比，锁定语义结论（§5 验证条款）。
+  CIZ 事件码规则已于 2026-08-26 用真实快照核对并冻结（见
+  ``split_events_from_distributions``）：``distype='FRS'``（disdetailtype ∈
+  {STKSPL 拆股, STKDIV 股票股利}），factor = 1 + disfacshr。
+- ``DlyFacPrc`` 的语义已验证为**当期事件因子**（AAPL 2020-08-31、NVDA
+  2024-06-10 双路对比均判 event，§5 验证条款）；管线仍走事件累计路径，
+  ``DlyFacPrc`` 只用于交叉审计（scripts/prepare_data.py 的 audit）。
 
 因子约定
 --------
@@ -28,6 +29,55 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
+
+# 冻结（2026-08-26，真实数据核对）：写入 OHLC 的复权事件 = FRS（拆股+股票股利）。
+# 全表 FRS 行 disfacpr == disfacshr；反向拆股 disfacshr<0（factor∈(0,1)）。
+# 分拆（SP/SEC*）等价格因子事件刻意排除（§5：不写入 OHLC）。
+SPLIT_DISTYPE = "FRS"
+
+
+def split_events_from_distributions(dist: pd.DataFrame) -> pd.DataFrame:
+    """CIZ distributions（数据库小写列名）→ 复权事件表 (PERMNO, ex_date, factor)。
+
+    factor = 新股数/旧股数 = 1 + disfacshr（CIZ 沿用 legacy 约定
+    facshr = (新−旧)/旧）。"""
+    ev = dist[dist["distype"] == SPLIT_DISTYPE].copy()
+    ev["ex_date"] = pd.to_datetime(ev["disexdt"])
+    ev["factor"] = 1.0 + ev["disfacshr"].astype(float)
+    if (ev["factor"] <= 0).any():
+        bad = ev.loc[ev["factor"] <= 0, ["permno", "disexdt", "disfacshr"]]
+        raise ValueError(f"非正复权因子（disfacshr ≤ -1）:\n{bad.head()}")
+    out = ev.rename(columns={"permno": "PERMNO"})[["PERMNO", "ex_date", "factor"]]
+    return out.sort_values(["PERMNO", "ex_date"], ignore_index=True)
+
+
+def adjust_panel(
+    panel: pd.DataFrame,
+    events: pd.DataFrame,
+    anchor: pd.Timestamp | str,
+    permno_col: str = "PERMNO",
+    date_col: str = "DlyCalDt",
+) -> pd.DataFrame:
+    """全量面板 → §5 复权后的训练蜡烛面板（8 列）。
+
+    price_adj = price / cumfactor；vol_adj = vol × cumfactor；
+    amt（DlyPrcVol）不动——price×vol 对拆股不变。无事件的股票 cumfactor=1。
+    events 为 ``split_events_from_distributions`` 的输出（或同构表）。"""
+    out = panel[[permno_col, date_col, "DlyOpen", "DlyHigh", "DlyLow",
+                 "DlyClose", "DlyVol", "DlyPrcVol"]].copy()
+    ev_by_pn = {pn: g for pn, g in events.groupby(permno_col)}
+    cf = np.ones(len(out))
+    dates_all = out[date_col].to_numpy()
+    for pn, idx in out.groupby(permno_col).indices.items():
+        ev = ev_by_pn.get(pn)
+        if ev is None:
+            continue
+        cf[idx] = event_cumfactor(ev, pd.DatetimeIndex(dates_all[idx]), anchor).to_numpy()
+    for c in ("DlyOpen", "DlyHigh", "DlyLow", "DlyClose"):
+        out[c] = out[c].to_numpy() / cf
+    out["DlyVol"] = out["DlyVol"].to_numpy() * cf
+    return out
 
 
 def event_cumfactor(

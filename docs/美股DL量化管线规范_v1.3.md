@@ -69,7 +69,7 @@ AND TradingStatusFlg='A'
 ## 6. Kronos 微调
 
 - 官方生成式目标不动;官方默认(finetune/config.py)lookback=90, predict=10, max_context=512。
-- 本项目 predict_window = 6;lookback 消融 {60, 90, 200, 400}(400+6+1=407 ≤ 512 ✓)。
+- 本项目 predict_window = 6;lookback 消融 {60, 90, 200}(2026-08-27 按先验删 400,理由见预注册 §2;512 上限对余档无约束)。
 - 特征 open/high/low/close/volume(+amount);推理按官方采样参数多路径取均值(参数名代码时核对)。
 
 ## 7. 切分与测试纪律

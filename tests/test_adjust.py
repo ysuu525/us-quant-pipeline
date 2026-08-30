@@ -76,3 +76,50 @@ def test_negative_factor_rejected():
     ev = pd.DataFrame({"ex_date": [DATES[2]], "factor": [-2.0]})
     with pytest.raises(ValueError):
         A.event_cumfactor(ev, DATES, DATES[-1])
+
+
+def _dist(rows):
+    return pd.DataFrame(rows, columns=[
+        "permno", "disexdt", "distype", "disfacpr", "disfacshr", "disdivamt"])
+
+
+def test_split_events_frozen_rule():
+    # FRS 入选（拆股 facshr=3 → factor 4；股票股利 0.05 → 1.05；反向 -0.75 → 0.25），
+    # CD/SP 等其他 distype 一律排除（§5：现金股息、分拆不写入 OHLC）
+    dist = _dist([
+        (14593, DATES[2], "FRS", 3.0, 3.0, np.nan),
+        (14593, DATES[4], "CD", 0.0, 0.0, 0.82),
+        (86580, DATES[3], "FRS", 0.05, 0.05, np.nan),
+        (11111, DATES[5], "FRS", -0.75, -0.75, np.nan),
+        (22222, DATES[6], "SP", 0.30, 0.0, 1.0),
+    ])
+    ev = A.split_events_from_distributions(dist)
+    assert list(ev["PERMNO"]) == [11111, 14593, 86580]
+    assert list(ev["factor"]) == pytest.approx([0.25, 4.0, 1.05])
+
+
+def test_split_events_rejects_nonpositive_factor():
+    with pytest.raises(ValueError):
+        A.split_events_from_distributions(
+            _dist([(1, DATES[0], "FRS", -1.0, -1.0, np.nan)]))
+
+
+def test_adjust_panel_multi_permno():
+    # permno 1 在 d4 2:1 拆股；permno 2 无事件 → 原样
+    panel = pd.concat([
+        pd.DataFrame({"PERMNO": 1, "DlyCalDt": DATES, "DlyOpen": 100.0,
+                      "DlyHigh": 110.0, "DlyLow": 90.0, "DlyClose": 105.0,
+                      "DlyVol": 1000.0, "DlyPrcVol": 105000.0}),
+        pd.DataFrame({"PERMNO": 2, "DlyCalDt": DATES, "DlyOpen": 50.0,
+                      "DlyHigh": 55.0, "DlyLow": 45.0, "DlyClose": 52.0,
+                      "DlyVol": 500.0, "DlyPrcVol": 26000.0}),
+    ], ignore_index=True)
+    ev = pd.DataFrame({"PERMNO": [1], "ex_date": [DATES[4]], "factor": [2.0]})
+    out = A.adjust_panel(panel, ev, anchor=DATES[-1])
+    p1 = out[out["PERMNO"] == 1].reset_index(drop=True)
+    p2 = out[out["PERMNO"] == 2].reset_index(drop=True)
+    assert p1["DlyClose"].iloc[0] == pytest.approx(52.5)
+    assert p1["DlyVol"].iloc[0] == pytest.approx(2000.0)
+    assert p1["DlyPrcVol"].iloc[0] == pytest.approx(105000.0)  # amt 不动
+    assert p1["DlyClose"].iloc[5] == pytest.approx(105.0)
+    assert (p2["DlyClose"] == 52.0).all() and (p2["DlyVol"] == 500.0).all()

@@ -36,3 +36,9 @@ Thumbs.db
 
 # --- 本机覆盖配置（模板 configs/default.yaml 进 git，本机实际路径不进） ---
 configs/local.yaml
+
+# --- 虚拟环境（本机，不进 git）---
+.venv/
+.venv-gbdt/
+downloader/.venv-dl/
+configs/local.yaml

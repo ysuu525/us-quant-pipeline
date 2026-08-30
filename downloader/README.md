@@ -20,6 +20,10 @@ pip install -r requirements.txt
 
 装的是三个包：`wrds`（连数据库）、`pandas`、`pyarrow`（写 parquet 文件）。
 
+> **别装进训练用的 `.venv`**：`wrds` 会把 pandas 钉在旧版（实测 3.5.0 →
+> 降级 pandas 2.2.3），污染训练环境。给下载器单开一个 venv（比如
+> `downloader/.venv-dl`），它本来就是独立可用的。
+
 ---
 
 ## 跑起来

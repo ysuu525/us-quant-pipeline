@@ -51,7 +51,7 @@ python -m kronos_ft.train --smoke
 
 torch 按平台装：Mac 直接 `pip install torch`（MPS/CPU）；Windows 用 CUDA
 wheel（Phase 4 的 setup 脚本负责）。克隆后第一件事是 `pytest` 全绿 +
-冒烟 PASS 才继续。逻辑问题在 Mac 上修，不在训练机上调试。
+冒烟 PASS 才继续。（2026-08-26 起开发与训练都在 Windows 机上进行。）
 
 ## Windows（4080 Super）使用流程
 
@@ -68,16 +68,25 @@ powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 
 ## 尚未落地 / 待真实数据核对的口径
 
-这些点在代码里以**参数/谓词注入**留了口子，注释里均有标记，接入真实数据后冻结：
+这些点在代码里以**参数/谓词注入**留了口子，注释里均有标记，接入真实数据后冻结。
+**2026-08-26 用真实快照核对后已冻结的**（探查与审计见 `scripts/prepare_data.py`
+产出的 `audit/report.md`）：
+
+- ~~CIZ distribution 复权事件码~~：**已冻结** = `distype='FRS'`
+  （disdetailtype ∈ {STKSPL, STKDIV}），factor = 1 + disfacshr
+  （`adjust.split_events_from_distributions`）；现金股息 = `distype='CD'`
+  （标签退出段用，待 labels 接线时复核）；
+- ~~`DlyFacPrc` 语义~~：**已验证 = 当期事件因子**（AAPL 2020-08-31、
+  NVDA 2024-06-10 双路均判 event）；管线仍走事件累计路径，DlyFacPrc 只作交叉审计；
+- ~~上市日~~：`prepare_data.py` 的 universe 阶段已改传
+  `stksecurityinfohist.securitybegdt` 为 `first_trade_dates`；
+- 另经核对：`DlyCap` 单位 = $千（AAPL 量级校验过）；`DlyPrcVol` =
+  DlyClose × DlyVol 精确成立。
+
+**仍待核对的**：
 
 - CIZ 业绩类退市码集合（`labels.compute_label` 的 `is_performance_delist`，
   Shumway 插补只允许作用于业绩类退市）；
-- CIZ distribution 事件码：哪些算现金股息（标签退出段）、哪些算拆股/股票股利
-  （复权事件），由调用方筛好再传入；
-- `DlyFacPrc` 语义（当期事件 vs 累计）：用 `adjust.dual_path_report` 在
-  AAPL 2020-08-31、NVDA 2024-06-10 拆股上锁定（§5 验证条款）;
-- 上市日：`universe.liquidity_flags` 目前用面板首行近似，接入
-  `stksecurityinfohist` 后改传 `first_trade_dates`；
 - 退市终值记录的 `DlyClose` 是否即终值（退市恰发生在 t+1 时首日段的口径），
   用 §10 Lehman 2008 golden fixture 核对；
 - 监管过手费（SEC fee / FINRA TAF）默认值为公开档位，开户后按账户后台
@@ -93,4 +102,9 @@ powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 - [x] Phase 2 评估与成本模块（§7.5、§8、§1 自建归因因子）
 - [x] Phase 3 Kronos 微调接入（§6 + 预注册 v1）+ Mac 冒烟
 - [x] Phase 4 Windows 部署材料（setup_windows.ps1、RUNBOOK_WINDOWS.md）
-- [ ] Phase 5 真实数据核对（coverage audit §10、双路复权验证、golden fixtures）
+- [ ] Phase 5 真实数据核对——进行中（2026-08-26）：
+  - [x] 快照加载层 `crsp_pipeline.snapshot` + 准备脚本 `scripts/prepare_data.py`
+  - [x] coverage audit §10（逐年缺失率/BA 占比/OHLC 一致性/DlyCap 量级/退市不变量）
+  - [x] 双路复权验证 §5（AAPL/NVDA → DlyFacPrc = 当期事件因子；事件码 FRS 冻结）
+  - [ ] golden fixtures（Lehman 2008 退市路径、标签引擎实数据 golden case）
+  - [ ] 业绩类退市码集合冻结 + labels 接线

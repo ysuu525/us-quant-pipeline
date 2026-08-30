@@ -27,16 +27,23 @@ def build_window_index(
     permno_col: str = "PERMNO",
     date_col: str = "DlyCalDt",
     require_volume: bool = True,
+    extra_valid: pd.Series | None = None,
 ) -> pd.DataFrame:
     """训练窗口索引：返回 (PERMNO, anchor, start, end)。
 
     anchor = 信号日 t（lookback 段最后一行）；窗口行 = [t−lookback+1, t+predict]
     共 lookback+predict 个**连续交易日**，全部行存在且 OHLC(V) 有效。
+
+    extra_valid : 与 panel 等长的附加行级有效性（如 cleaning.quality_ok_mask，
+        训练池消融 C 臂）；与 OHLC 有效性取与——含任一 False 行的窗口整体排除。
     """
     win = lookback + predict
     df = panel[[permno_col, date_col]].copy()
     df[date_col] = pd.to_datetime(df[date_col])
-    df["_valid"] = valid_ohlc_mask(panel, require_volume=require_volume).to_numpy()
+    valid = valid_ohlc_mask(panel, require_volume=require_volume)
+    if extra_valid is not None:
+        valid &= extra_valid
+    df["_valid"] = valid.to_numpy()
 
     frames = []
     for pn, g in df.groupby(permno_col):
@@ -65,6 +72,26 @@ def build_window_index(
     if not frames:
         return pd.DataFrame(columns=[permno_col, "anchor", "start", "end"])
     return pd.concat(frames, ignore_index=True)
+
+
+def filter_index_by_universe(
+    index: pd.DataFrame,
+    universe: pd.DataFrame,
+    permno_col: str = "PERMNO",
+    date_col: str = "DlyCalDt",
+    flag_col: str = "in_universe",
+) -> pd.DataFrame:
+    """只保留 anchor 日该股在 §2 universe 内的窗口（训练池消融 B 臂，2026-08-27）。
+
+    universe 为 prepare_data.py 产出的 universe.parquet（逐行 point-in-time
+    标志，只用 t 日及以前信息构造，无前视）。"""
+    u = universe[[permno_col, date_col, flag_col]].copy()
+    u[date_col] = pd.to_datetime(u[date_col])
+    merged = index.merge(
+        u.rename(columns={date_col: "anchor"}), on=[permno_col, "anchor"], how="left"
+    )
+    keep = merged[flag_col].fillna(False).astype(bool)
+    return index[keep.to_numpy()].reset_index(drop=True)
 
 
 def filter_anchors(index: pd.DataFrame, start, end) -> pd.DataFrame:

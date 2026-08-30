@@ -64,3 +64,40 @@ def test_time_features(cal):
     d0 = cal.dates[0]
     # [minute, hour, weekday, day, month]（日频 → minute=hour=0）
     assert stamp[0].tolist() == [0.0, 0.0, float(d0.weekday()), float(d0.day), float(d0.month)]
+
+
+def test_sampling_len_capped_and_deterministic(cal):
+    # 官方 n_iter 契约：len = min(samples_per_epoch, 池大小)；
+    # 同 seed 同 epoch → 同一抽样序列；不同 epoch → 不同序列
+    L, P = 8, 4
+    p = make_panel(cal, 40)
+    idx = build_window_index(p, cal, L, P)
+    assert len(idx) > 3
+
+    ds = KronosWindowDataset(p, idx, cal, L, P, samples_per_epoch=3, seed=7)
+    assert len(ds) == 3
+    big = KronosWindowDataset(p, idx, cal, L, P, samples_per_epoch=10**6, seed=7)
+    assert len(big) == len(idx)  # 上限=池大小
+
+    ds.set_epoch_seed(1)
+    seq_a = [ds[i][0].numpy().copy() for i in range(3)]
+    ds.set_epoch_seed(1)
+    seq_b = [ds[i][0].numpy().copy() for i in range(3)]
+    for a, b in zip(seq_a, seq_b):
+        assert np.array_equal(a, b)
+
+    ds.set_epoch_seed(2)
+    seq_c = [ds[i][0].numpy() for i in range(3)]
+    assert any(not np.array_equal(a, c) for a, c in zip(seq_a, seq_c))
+
+
+def test_sampling_none_keeps_enumeration(cal):
+    L, P = 8, 4
+    p = make_panel(cal, 30)
+    idx = build_window_index(p, cal, L, P)
+    ds = KronosWindowDataset(p, idx, cal, L, P)          # 默认：枚举
+    assert len(ds) == len(idx)
+    x0a, _ = ds[0]
+    ds.set_epoch_seed(99)                                 # 枚举模式下无效果
+    x0b, _ = ds[0]
+    assert np.array_equal(x0a.numpy(), x0b.numpy())

@@ -68,3 +68,41 @@ def test_exclusion_report_by_year_exchange(cal):
     # 每只股票前 4 个样本被排除：排除率 4/10
     assert set(rep["PrimaryExch"]) == {"N", "Q"}
     assert rep["exclusion_rate"].tolist() == pytest.approx([0.4, 0.4])
+
+
+def test_quality_ok_mask_flags():
+    from crsp_pipeline.cleaning import quality_ok_mask
+    # permno 1: 第 3 行零成交量；第 6 行 +60% 跳变；permno 2: 5 连平收盘价
+    p1 = pd.DataFrame({
+        "PERMNO": 1,
+        "DlyClose": [10.0, 10.5, 10.4, 10.6, 10.5, 16.8, 16.5, 16.6],
+        "DlyVol":   [1e5, 1e5, 0.0, 1e5, 1e5, 1e5, 1e5, 1e5],
+    })
+    p2 = pd.DataFrame({
+        "PERMNO": 2,
+        "DlyClose": [5.0, 5.1, 5.1, 5.1, 5.1, 5.1, 5.2, 5.3],
+        "DlyVol": 1e5,
+    })
+    panel = pd.concat([p1, p2], ignore_index=True)
+    ok = quality_ok_mask(panel)
+    assert not ok.iloc[2]          # 零成交量
+    assert not ok.iloc[5]          # |ret|>0.5
+    assert ok.iloc[3] and ok.iloc[4]
+    # permno 2 的 5 连平段（行 9..13）整段被标；段外正常
+    assert not ok.iloc[9] and not ok.iloc[13]
+    assert ok.iloc[8] and ok.iloc[14]
+
+
+def test_quality_ok_mask_no_cross_permno_leak():
+    from crsp_pipeline.cleaning import quality_ok_mask
+    # permno 边界处价格跳变/平价延续不得跨股票判定
+    panel = pd.DataFrame({
+        "PERMNO": [1, 1, 2, 2],
+        "DlyClose": [10.0, 10.0, 100.0, 100.0],   # 1->2 跳 10 倍：不算跳变
+        "DlyVol": 1e5,
+    })
+    ok = quality_ok_mask(panel, stagnation_run=2)
+    assert not ok.iloc[0] and not ok.iloc[1]      # permno1 两连平（run=2）
+    assert not ok.iloc[2] and not ok.iloc[3]      # permno2 自身两连平
+    ok2 = quality_ok_mask(panel, stagnation_run=3)
+    assert ok2.all()                               # 各自只有 2 连，不够 3

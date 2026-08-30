@@ -28,6 +28,41 @@ def valid_ohlc_mask(panel: pd.DataFrame, require_volume: bool = True) -> pd.Seri
     return m
 
 
+def quality_ok_mask(
+    panel: pd.DataFrame,
+    permno_col: str = "PERMNO",
+    max_abs_ret: float = 0.5,
+    stagnation_run: int = 5,
+) -> pd.Series:
+    """Kronos 论文 Appendix B 式质量过滤的行级近似（训练池消融 C 臂，2026-08-27）。
+
+    行不合格（False）当：DlyVol == 0（illiquidity）；相邻行收盘价变动
+    |close/prev − 1| > max_abs_ret（结构跳变；输入为复权后面板时拆股跳变
+    已被消除，此处滤到的是数据异常与极端行情——后者也被滤是本过滤的已知
+    代价）；或处于连续 ≥ stagnation_run 个相同 DlyClose 的停滞段内。
+
+    要求 panel 已按 (PERMNO, 日期) 排序（snapshot.load_daily 的输出即是）。
+    缺失值不在此判定（交给 valid_ohlc_mask）。窗口级排除由
+    windows.build_window_index 的 extra_valid 参数完成。
+    """
+    close = panel["DlyClose"]
+    pn = panel[permno_col]
+    same_stock = pn.eq(pn.shift())
+
+    ok = pd.Series(True, index=panel.index)
+    if "DlyVol" in panel.columns:
+        ok &= panel["DlyVol"].fillna(0) > 0
+
+    ret = (close / close.shift() - 1).where(same_stock)
+    ok &= ret.abs().fillna(0) <= max_abs_ret
+
+    new_run = ~(close.eq(close.shift()) & same_stock)
+    run_id = new_run.cumsum()
+    run_size = run_id.groupby(run_id).transform("size")
+    ok &= ~((run_size >= stagnation_run) & close.notna())
+    return ok
+
+
 def ba_flag_stats(
     panel: pd.DataFrame,
     date_col: str = "DlyCalDt",
