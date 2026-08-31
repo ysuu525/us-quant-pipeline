@@ -71,19 +71,67 @@ def block(P, cal, adj, uni, lookback, s, e, tok, mdl, pool, cache, predict=6):
 
 
 def prep(m, E):
+    """保持表示为 float16（原样），float64 转换交给 RidgeFit 分块做。
+
+    此前直接 astype(float64) 会把 110 万 x 512 的训练表示膨胀到 4.6GB，
+    加上标准化后的副本峰值超过 10GB —— 首次七折跑批即在 fold40 处被内存打断。
+    """
     keep = ((m["status"] == "ok") & m["label"].notna()).to_numpy()
     m2 = m[keep].reset_index(drop=True)
     y = m2.groupby("signal_date")["label"].rank(pct=True).to_numpy(np.float64)
     d = m2["signal_date"].to_numpy().astype("datetime64[D]").astype(np.int64)
-    return E[keep].astype(np.float64), d, y
+    return E[keep], d, y
+
+
+class RidgeFit:
+    """分块预计算 X'X 与 X'y，之后每个 alpha 只需一次 512x512 求解。
+
+    两处优化：
+    - X'X 与 alpha 无关且占全部算力的 99%，原实现对每个 alpha 重算一遍（14 次冗余）；
+    - 分块累加避免把 float64 的标准化矩阵整体materialize（峰值从 >10GB 降到约 0.4GB）。
+    """
+
+    CHUNK = 20_000
+
+    def __init__(self, X, y, rows=None):
+        """rows: 行索引（可选）。用它而不是 X[mask] 取子集——布尔取子集会整体
+        复制（110 万 x 512 的 float16 就是 1.1GB），在提交限制紧张时直接炸。"""
+        idx = np.arange(len(X)) if rows is None else np.asarray(rows)
+        d = X.shape[1]
+        n = len(idx)
+        self.mu = np.zeros(d)
+        acc2 = np.zeros(d)
+        for i in range(0, n, self.CHUNK):
+            blk = X[idx[i:i + self.CHUNK]].astype(np.float64)
+            self.mu += blk.sum(0)
+            acc2 += (blk * blk).sum(0)
+            del blk
+        self.mu /= n
+        self.sd = np.sqrt(np.maximum(acc2 / n - self.mu ** 2, 0)) + 1e-8
+        self.G = np.zeros((d, d))
+        self.b = np.zeros(d)
+        ym = y[idx].mean()
+        for i in range(0, n, self.CHUNK):
+            j = idx[i:i + self.CHUNK]
+            Z = (X[j].astype(np.float64) - self.mu) / self.sd
+            self.G += Z.T @ Z
+            self.b += Z.T @ (y[j] - ym)
+            del Z
+        self.I = np.eye(d)
+
+    def predict(self, Xva, alpha, rows=None):
+        w = np.linalg.solve(self.G + alpha * self.I, self.b)
+        idx = np.arange(len(Xva)) if rows is None else np.asarray(rows)
+        out = np.empty(len(idx))
+        for i in range(0, len(idx), self.CHUNK):
+            j = idx[i:i + self.CHUNK]
+            out[i:i + self.CHUNK] = (
+                (Xva[j].astype(np.float64) - self.mu) / self.sd) @ w
+        return out
 
 
 def ridge(Xtr, ytr, Xva, alpha):
-    mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-8
-    Z = (Xtr - mu) / sd
-    A = Z.T @ Z + alpha * np.eye(Z.shape[1])
-    w = np.linalg.solve(A, Z.T @ (ytr - ytr.mean()))
-    return ((Xva - mu) / sd) @ w
+    return RidgeFit(Xtr, ytr).predict(Xva, alpha)
 
 
 def daily_ic(pred, y, day):
@@ -112,6 +160,8 @@ def main():
     ap.add_argument("--lookback", type=int, default=90)
     ap.add_argument("--alphas", default="1e6,1e7,3e7,1e8,3e8,1e9,1e10")
     ap.add_argument("--out-json", default="outputs/ridge_probe.json")
+    ap.add_argument("--folds", default="", help="逗号分隔的折名；留空=全部。"
+                    "用于把已缓存的折先跑出来，未缓存的等 GPU 空出来再补")
     args = ap.parse_args()
 
     P = Path(args.processed)
@@ -125,13 +175,30 @@ def main():
     uni_all = pd.read_parquet(P / "universe.parquet",
                               columns=["PERMNO", "DlyCalDt", "in_universe"])
 
+    want = {x.strip() for x in args.folds.split(",") if x.strip()}
     results = {}
+    if Path(args.out_json).exists():          # 增量累积，便于分批补折
+        results = {k: v for k, v in
+                   json.loads(Path(args.out_json).read_text(encoding="utf-8")).items()
+                   if not k.startswith("_")}
     for name, ts, te, vs, ve in FOLDS:
+        if want and name not in want:
+            continue
         log(f"\n===== {name}（pool={args.pool}）=====")
         lo = cal.shift(cal.snap_forward(pd.Timestamp(ts)), -(args.lookback + 30))
         hi = cal.dates[min(cal.index_of(cal.snap_back(pd.Timestamp(ve))) + 8, len(cal) - 1)]
-        adj = pd.read_parquet(P / "panel_kronos_adj.parquet")
-        adj = adj[(adj["DlyCalDt"] >= lo) & (adj["DlyCalDt"] <= hi)]
+        # 只在缓存缺失时才读面板：整表读入约 2.4GB，缓存命中时纯属浪费，
+        # 且与并行的 GPU 任务叠加会触发 OOM（首轮七折跑批即因此在 fold40 中断）。
+        cached = all((croot / f"{name}_{part}").with_suffix(sfx).exists()
+                     for part in ("train", "val")
+                     for sfx in (f".{args.pool}.npy", ".parquet"))
+        if cached:
+            adj = None
+            log("  表示缓存命中，跳过面板读取")
+        else:
+            adj = pd.read_parquet(
+                P / "panel_kronos_adj.parquet",
+                filters=[("DlyCalDt", ">=", lo), ("DlyCalDt", "<=", hi)])
         m_tr, E_tr = block(P, cal, adj, uni_all, args.lookback, ts, te, tok, mdl,
                            args.pool, croot / f"{name}_train")
         m_va, E_va = block(P, cal, adj, uni_all, args.lookback, vs, ve, tok, mdl,
@@ -153,20 +220,21 @@ def main():
         log(f"  内层选参窗 [{inner_start.date()}..{anchors.max().date()}]，"
             f"内层训练截至 {inner_cut.date()}")
 
+        r_out, r_in = np.flatnonzero(d_out), np.flatnonzero(d_in)
+        fit_in = RidgeFit(Xtr, ytr, rows=r_out)   # 内层选参用
+        fit_out = RidgeFit(Xtr, ytr)              # 全训练窗，出外层读数
         picked, best_inner = None, -np.inf
         for a in alphas:
-            p_in = ridge(Xtr[d_out], ytr[d_out], Xtr[d_in], a)
-            ic_in, _, _ = daily_ic(p_in, ytr[d_in], dtr[d_in])
-            p_out = ridge(Xtr, ytr, Xva, a)
-            ic_out, t_out, nd = daily_ic(p_out, yva, dva)
+            ic_in, _, _ = daily_ic(fit_in.predict(Xtr, a, rows=r_in),
+                                   ytr[r_in], dtr[r_in])
+            ic_out, t_out, nd = daily_ic(fit_out.predict(Xva, a), yva, dva)
             mark = ""
             if ic_in > best_inner:
                 best_inner, picked = ic_in, (a, ic_out, t_out, nd)
                 mark = "  << 内层最优"
             log(f"  alpha={a:>8.0e}: 内层 {ic_in:+.5f} | 外层 {ic_out:+.5f} "
                 f"(t {t_out:+.2f}){mark}")
-        oracle = max(
-            (daily_ic(ridge(Xtr, ytr, Xva, a), yva, dva)[0] for a in alphas))
+        oracle = max(daily_ic(fit_out.predict(Xva, a), yva, dva)[0] for a in alphas)
         results[name] = {"alpha": picked[0], "rank_ic": picked[1], "t": picked[2],
                          "n_days": picked[3], "pool": args.pool,
                          "inner_rank_ic": float(best_inner),
