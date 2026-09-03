@@ -1,0 +1,9 @@
+# 全仓禁用行尾自动转换。
+#
+# 理由（2026-09-04，预注册存证）：core.autocrlf=true 时 Windows 上 checkout
+# 会把 LF 改写成 CRLF，而 scripts/preregistration_manifest.py 是按**工作区字节**
+# 算 sha256 的。若不禁用转换，第三方 clone 后重算哈希必然与被时间戳锚定的
+# manifest 不符 —— 外部可验证性直接失效。
+#
+# 代价：.ps1 等文件的行尾由写入者负责（PS 5.1 另需 UTF-8 BOM，见 CLAUDE.md §七）。
+* -text

@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from crsp_pipeline.calendar import TradingCalendar  # noqa: E402
 from crsp_pipeline.labels import compute_labels  # noqa: E402
+from crsp_pipeline.sealed import sha256_file, write_seal  # noqa: E402
 from crsp_pipeline.signal_eval import (  # noqa: E402
     daily_rank_ic,
     decile_spread,
@@ -90,6 +91,8 @@ def main() -> None:
     ap.add_argument("--device", default=None, help="cpu / cuda；默认自动")
     ap.add_argument("--limit-obs", type=int, default=0,
                     help="只打前 N 个观测（冒烟验证代码路径用；正式评估勿用）")
+    ap.add_argument("--sealed", action="store_true",
+                    help="封存模式（2026-09-02 授权）：写完 scores.parquet 立即返回；绝不进入 label/metrics/report/daily_ic 路径；登记簿只记计算事实、不记任何分数统计")
     args = ap.parse_args()
 
     model_dir = Path(args.model_dir)
@@ -132,6 +135,52 @@ def main() -> None:
                          batch_size=args.batch_size, device=args.device,
                          amp=args.amp, sample_count=args.sample_count)
     scores.to_parquet(out / "scores.parquet", index=False)
+
+    if args.sealed:
+        # ---- 硬性提前返回。此行之后的 label / metrics / report / ledger-统计
+        # ---- 路径在封存模式下永不执行（2026-09-02 授权：计算 != 读取）。
+        src = REPO_ROOT / "src"
+        manifest = {
+            "fold_tag": args.tag,
+            "snapshot_id": Path(args.processed).name,
+            "val_window": [str(val_start.date()), str(val_end.date())],
+            "model_dir": str(model_dir),
+            "config": {
+                "lookback": args.lookback, "predict": args.predict,
+                "sample_count": args.sample_count, "amp": args.amp,
+                "batch_size": args.batch_size, "device": args.device,
+                "pool": "B (universe anchor)", "arm": args.tag,
+            },
+            "code_sha256": {
+                rel: sha256_file(src / rel) for rel in
+                ("kronos_ft/train.py", "kronos_ft/infer.py", "kronos_ft/models.py",
+                 "kronos_ft/windows.py", "crsp_pipeline/splits.py")
+                if (src / rel).exists()
+            } | {"scripts/evaluate_fold.py": sha256_file(Path(__file__))},
+            "scores_sha256": sha256_file(out / "scores.parquet"),
+            "scores_rows": int(len(scores)),
+            "limit_obs": args.limit_obs,
+            # 数据质量计数（不是绩效统计），只进清单与封存日志，不上控制台
+            "score_nan_share": float(scores["score"].isna().mean()),
+            "extrapolated_share": float(scores["extrapolated"].mean()),
+        }
+        write_seal(out, manifest)
+        (out / "sealed_run.log").write_text(
+            "".join([
+                "sealed scoring completed", chr(10),
+                "tag=", args.tag, chr(10),
+                "rows=", str(len(scores)), chr(10),
+                "val=[", str(val_start.date()), "..", str(val_end.date()), "]", chr(10),
+            ]),
+            encoding="utf-8")
+        append_ledger(
+            f"sealed-compute | tag={args.tag} "
+            f"val=[{val_start.date()}..{val_end.date()}] rows={len(scores)} "
+            f"（封存打分：未生成 labels、未计算任何指标；计算授权 != 读取授权）"
+        )
+        log(f"[SEALED] 折 {args.tag} 完成 → {out}（仅 scores + 清单 + 哨兵）")
+        return
+
     log(f"scores: {len(scores):,} 行, NaN {scores['score'].isna().mean():.4f}, "
         f"外推 {scores['extrapolated'].mean():.4f}")
 

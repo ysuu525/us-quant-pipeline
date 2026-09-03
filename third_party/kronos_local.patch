@@ -1,0 +1,13 @@
+diff --git a/model/kronos.py b/model/kronos.py
+index ce4494e..291a6f5 100644
+--- a/model/kronos.py
++++ b/model/kronos.py
+@@ -463,7 +463,7 @@ def auto_regressive_inference(tokenizer, model, x, x_stamp, y_stamp, max_context
+         ]
+         z = tokenizer.decode(input_tokens, half=True)
+         z = z.reshape(-1, sample_count, z.size(1), z.size(2))
+-        preds = z.cpu().numpy()
++        preds = z.float().cpu().numpy()  # .float(): bf16 autocast 下 numpy 不支持 BFloat16（差异清单 2026-08-29；fp32 为空操作）
+         preds = np.mean(preds, axis=1)
+ 
+         return preds

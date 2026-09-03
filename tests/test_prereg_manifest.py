@@ -40,6 +40,7 @@ def make_repo(tmp_path: Path, *, with_v02: bool = False, with_prereg_v2: bool = 
     repo = tmp_path / "repo"
     (repo / "experiments").mkdir(parents=True)
     (repo / "docs").mkdir()
+    (repo / "third_party").mkdir()
     for rel, text in [
         ("experiments/ledger.md", "- 2026-09-04 | DECISION | 假登记簿\n"),
         ("experiments/confirmation_protocol_v3.md", "协议 v3\n"),
@@ -48,6 +49,7 @@ def make_repo(tmp_path: Path, *, with_v02: bool = False, with_prereg_v2: bool = 
         ("CLAUDE.md", "强制规则\n"),
         ("HANDOFF.md", "交接\n"),
         ("docs/研究计划书_2026-09-03.md", "计划书 v0.1\n"),
+        ("third_party/kronos_local.patch", "diff --git a/model/kronos.py\n"),
     ]:
         (repo / rel).write_text(text, encoding="utf-8")
     if with_v02:

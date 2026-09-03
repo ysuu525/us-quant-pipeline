@@ -20,6 +20,7 @@
   docs/研究计划书_v0.2_2026-09-04.md        （不存在则回退到 v0.1 = 2026-09-03 版）
   CLAUDE.md
   HANDOFF.md
+  third_party/kronos_local.patch            （子模块工作区补丁，见 DEFAULT_FILES 处注释）
   所有封存目录下的 SEALED_MANIFEST.json（glob，见下）
 
 **只读 SEALED_MANIFEST.json 这一个文件，而且只按字节算哈希、不解析内容。**
@@ -139,6 +140,10 @@ DEFAULT_FILES: tuple[str, ...] = (
     "experiments/cost_pilot_protocol_v1_draft.md",
     "CLAUDE.md",
     "HANDOFF.md",
+    # third_party/kronos 是子模块，其工作区带一处本地补丁（bf16 -> numpy），
+    # 而 SEALED_MANIFEST.json 的 code_sha256 只覆盖 kronos_ft/* 与 splits.py，
+    # 不含 third_party。把补丁本身收进清单，推理路径才算完整可核。
+    "third_party/kronos_local.patch",
 )
 
 # 研究计划书：优先 v0.2，缺失则回退 v0.1；两者都没有时记前者为 missing
