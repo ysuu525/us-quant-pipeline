@@ -12,14 +12,23 @@ ADV20, and signal-date closing prices.  It NEVER reads ``labels.parquet``,
 ``DlyRet``, or any forward return.  No P&L, no IC, no fold-level performance
 number is produced.
 
-Pre-registered scope (written before the run)
----------------------------------------------
+Experiment 5 criterion and use restriction (written before the NT=5 run)
+-------------------------------------------------------------------------
+This is a mechanical conversion with no threshold.  It MUST NOT be used to
+choose holding period NT, exit band EXIT_PCT, universe TOPN, or any other
+strategy element.  In particular, NT=5 was already fixed in the 2026-09-03
+ledger decision; this audit only translates that decision into order-flow
+budget numbers.
+
+Original pre-registered K13 scope
+---------------------------------
 The outputs MAY be used to choose the pilot's AUM, its duration, its target
 fill count per arm, and whether the two arms can share fills.
 The outputs MAY NOT be used to choose holding period NT, exit band EXIT_PCT,
 universe TOPN, or any other element of the frozen strategy: selecting those on
-already-consumed folds would be a new development search.  The frozen values
-NT=6, EXIT_PCT=0.30, TOPN=500 are imported, not searched.
+already-consumed folds would be a new development search.  The baseline
+defaults NT=6, EXIT_PCT=0.30, TOPN=500 are imported, not searched; ``--nt 5``
+is the already-decided mechanical rerun, not a candidate scan.
 
 Cost benchmark this pilot will measure
 --------------------------------------
@@ -33,6 +42,7 @@ pays it too.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 from pathlib import Path
@@ -40,7 +50,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from k9_cost_alpha_frontier import EPS, EXIT_PCT, FOLDS, HI, LO, NT, OUT, PANEL, TOPN
+from k9_cost_alpha_frontier import (
+    EPS,
+    EXIT_PCT,
+    FOLDS,
+    HI,
+    LO,
+    NT as DEFAULT_NT,
+    OUT,
+    PANEL,
+    TOPN,
+)
 
 ARM_PATHS = {
     "FT": {f: OUT / f"{f}_lb90_s0_poolB_universe" / f"eval_amp_lb90_{f}" for f in FOLDS},
@@ -94,7 +114,7 @@ def load_scores(path: Path) -> pd.DataFrame:
     return s
 
 
-def orders_for_arm(arm: str, adv: dict, px: dict) -> pd.DataFrame:
+def orders_for_arm(arm: str, adv: dict, px: dict, nt: int = DEFAULT_NT) -> pd.DataFrame:
     """Replay the frozen sleeve construction and emit one row per one-way fill."""
     rows: list[dict] = []
     for fold in FOLDS:
@@ -102,8 +122,8 @@ def orders_for_arm(arm: str, adv: dict, px: dict) -> pd.DataFrame:
         by_day = {d: dict(zip(g.PERMNO, g.score))
                   for d, g in scores.groupby("signal_date") if len(g) >= 50}
         days = sorted(by_day)
-        selection_book: list[list[int] | None] = [None] * NT
-        path_book: list[dict[int, float] | None] = [None] * NT
+        selection_book: list[list[int] | None] = [None] * nt
+        path_book: list[dict[int, float] | None] = [None] * nt
 
         for i, day in enumerate(days):
             raw = by_day[day]
@@ -119,7 +139,7 @@ def orders_for_arm(arm: str, adv: dict, px: dict) -> pd.DataFrame:
             pct = (pd.Series(current).rank() / len(current)).to_dict()
             order = sorted(pct, key=lambda p: -pct[p])
             k = max(1, len(current) // 10)
-            sleeve = i % NT
+            sleeve = i % nt
             prev_sel = selection_book[sleeve]
             if prev_sel is None:
                 selected = list(order[:k])
@@ -154,7 +174,7 @@ def orders_for_arm(arm: str, adv: dict, px: dict) -> pd.DataFrame:
                         "side": "BUY" if d_w > 0 else "SELL",
                         # book-level notional fraction of AUM; only one sleeve
                         # rebalances per day, so no cross-sleeve netting exists
-                        "w_frac": abs(d_w) / NT,
+                        "w_frac": abs(d_w) / nt,
                         "adv20": float(a) if np.isfinite(a) else np.nan,
                         "close_px": float(price) if np.isfinite(price) else np.nan,
                         "adv_pct_in_pool": apct,
@@ -206,14 +226,47 @@ def summarize(df: pd.DataFrame) -> dict:
     return out
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--nt",
+        type=int,
+        default=DEFAULT_NT,
+        help=f"Number of staggered holding sleeves (default: {DEFAULT_NT}).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=OUT / "k13_order_audit.json",
+        help="Summary JSON path (default: outputs/k13_order_audit.json).",
+    )
+    args = parser.parse_args(argv)
+    if args.nt < 1:
+        parser.error("--nt must be a positive integer")
+    return args
+
+
+def _orders_dest(summary_dest: Path, arm: str) -> Path:
+    """Keep legacy names by default and suffix custom-run order artifacts."""
+    stem = summary_dest.stem
+    prefix = "k13_order_audit"
+    suffix = stem[len(prefix):] if stem.startswith(prefix) else f"_{stem}"
+    return summary_dest.parent / f"k13_orders_{arm}{suffix}.parquet"
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+    nt = int(args.nt)
+    dest = args.out.resolve()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
     log("[1/4] loading lagged ADV20 and signal-date closes (pruned + pushdown)...")
     adv, px = load_market()
 
     frames = {}
     for arm in ("FT", "ZS"):
         log(f"[2/4] replaying frozen sleeve construction for {arm}...")
-        frames[arm] = orders_for_arm(arm, adv, px)
+        frames[arm] = orders_for_arm(arm, adv, px, nt=nt)
         log(f"      {arm}: {len(frames[arm])} one-way fills, "
             f"{frames[arm].trade_date.nunique()} trade days")
 
@@ -239,7 +292,7 @@ def main() -> None:
 
     result = {
         "frozen_construction": {
-            "NT": NT, "TOPN": TOPN, "EXIT_PCT": EXIT_PCT,
+            "NT": nt, "TOPN": TOPN, "EXIT_PCT": EXIT_PCT,
             "folds": FOLDS, "window": [LO, HI],
             "execution_convention": "score at t close, fill at t+1 raw DlyOpen",
             "warmup_excluded": "first NT rebalances per sleeve (old is None)",
@@ -251,10 +304,9 @@ def main() -> None:
         "cross_arm": overlap,
     }
 
-    dest = OUT / "k13_order_audit.json"
     dest.write_text(json.dumps(result, indent=1, ensure_ascii=False), encoding="utf-8")
     for arm in ("FT", "ZS"):
-        frames[arm].to_parquet(OUT / f"k13_orders_{arm}.parquet", index=False)
+        frames[arm].to_parquet(_orders_dest(dest, arm), index=False)
     log(f"[4/4] wrote {dest}")
 
     for arm in ("FT", "ZS"):
