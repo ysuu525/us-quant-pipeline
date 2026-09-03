@@ -776,7 +776,8 @@ IC 在物理上算不出来」——**这是错的**。有 `scores.parquet` 和�
 ### 12.3 队列结束后按顺序做（都不需要 GPU）
 
 1. 用户裁定 12.2 第 1 条 → 改 `signal2_prereg_v1.md` → 登记 → 跑 `scripts/signal2_devfold_readout.py`（真实模式，逐折分块读）；
-2. 跑 `scripts/check_construction_parity.py`（新旧构造在真实折 36–42 逐位对拍，退出码 0 才算抽取成功）；
+   1b. **封存队列已于 09-03 21:07 全部完成**（33 折，SEALED 哨兵齐全）；**NT=5 基准读数已授权（ledger 09-03 持仓期条目），对拍通过后运行 `scripts/nt5_baseline_readout.py`；**
+2. ~~跑 `scripts/check_construction_parity.py`~~ ✅ 09-03 21:57 通过（lb90/lb200 均 array_equal，最大差 0）；
 3. 读两份调研（流派、信号源），定第三条腿候选；
 4. 把 §11.2 六项裁定、k=2 minimax-regret、退出线 30% 的信度解析再归类（28.3%）、信号#2 spec_hash 一并写入 ledger。
 
