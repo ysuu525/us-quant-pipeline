@@ -27,6 +27,12 @@
 零样本与微调是同日、同名字集打的分，共用这一套标签，所以
 :func:`load_labels` 默认 ``arm="ft"``——信号 #2 也必须用它，才能保证
 「与 Kronos 完全同一套标签口径」。
+
+实验重打分路径
+--------------
+实验 3 / 9 只允许读取下面 :data:`EXPERIMENT_SCORE_FOLDS` 写死的开发折与 tag。
+它们仍须经 :func:`scores_path` 生成路径，未知 tag、错误折号或 ZS 臂一律拒绝；
+默认 ``experiment_tag=None`` 的既有路径行为不变。
 """
 from __future__ import annotations
 
@@ -51,6 +57,21 @@ ARMS: tuple[str, ...] = ("ft", "zs")
 EARLY_FOLDS: tuple[int, ...] = (1, 2, 3, 4)
 MODERN_FOLDS: tuple[int, ...] = tuple(range(36, 43))
 ALLOWED_FOLDS: frozenset[int] = frozenset(EARLY_FOLDS + MODERN_FOLDS)
+
+# 实验 3 / 9 的 GPU 重打分矩阵。显式枚举，防止调用方用任意 tag 绕过路径纪律。
+EXPERIMENT_SCORE_FOLDS: dict[str, frozenset[int]] = {
+    "e1_sc10": frozenset((36, 39, 42)),
+    "e1_sc20": frozenset((36, 37, 38, 39, 40, 41, 42)),
+    "e1_sc40": frozenset((36, 39, 42)),
+    "e9_sc5_r1": frozenset((36, 39, 42)),
+    "e9_sc5_r2": frozenset((36, 39, 42)),
+    "e9_sc10_r1": frozenset((36, 39, 42)),
+    "e9_sc10_r2": frozenset((36, 39, 42)),
+    "e9_sc20_r1": frozenset((36, 39, 42)),
+    "e9_sc20_r2": frozenset((36, 39, 42)),
+    "e9_sc40_r1": frozenset((36, 39, 42)),
+    "e9_sc40_r2": frozenset((36, 39, 42)),
+}
 
 # 折 01–04 的不规则目录名（与 k8_ensemble.EARLY 逐字一致）
 _EARLY_FT_DIRS: dict[int, str] = {
@@ -90,10 +111,23 @@ def _check_arm(arm: str) -> str:
     return arm
 
 
-def eval_dir(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT) -> Path:
+def eval_dir(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT, *,
+             experiment_tag: str | None = None) -> Path:
     """该折该臂的评估目录（不检查是否存在）。"""
     f, a = _check_fold(fold_id), _check_arm(arm)
     root = Path(root)
+    if experiment_tag is not None:
+        allowed = EXPERIMENT_SCORE_FOLDS.get(experiment_tag)
+        if allowed is None:
+            raise ValueError(f"未登记的实验打分 tag: {experiment_tag!r}")
+        if a != "ft":
+            raise ValueError("实验 3 / 9 的重打分路径只允许 FT 臂")
+        if f not in allowed:
+            raise FoldNotAllowedError(
+                f"实验 tag {experiment_tag!r} 不允许读取折 {f:02d}；"
+                f"允许折号为 {sorted(allowed)}")
+        return (root / f"fold{f:02d}_lb90_s0_poolB_universe"
+                / f"eval_{experiment_tag}")
     if a == "ft":
         if f in _EARLY_FT_DIRS:
             return root / _EARLY_FT_DIRS[f]
@@ -103,8 +137,10 @@ def eval_dir(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT) -> Path:
     return root / "zeroshot_base" / f"eval_zeroshot_fold{f:02d}"
 
 
-def scores_path(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT) -> Path:
-    return eval_dir(fold_id, arm, root) / "scores.parquet"
+def scores_path(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT, *,
+                experiment_tag: str | None = None) -> Path:
+    return eval_dir(fold_id, arm, root,
+                    experiment_tag=experiment_tag) / "scores.parquet"
 
 
 def labels_path(fold_id: int, arm: Arm = "ft",
