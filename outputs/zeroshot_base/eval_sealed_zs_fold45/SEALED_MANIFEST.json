@@ -1,0 +1,34 @@
+{
+  "fold_tag": "sealed_zs_fold45",
+  "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+  "val_window": [
+    "2025-01-03",
+    "2025-07-02"
+  ],
+  "model_dir": "F:\\quant\\us-quant-pipeline\\outputs\\zeroshot_base",
+  "config": {
+    "lookback": 90,
+    "predict": 6,
+    "sample_count": 5,
+    "amp": "bf16",
+    "batch_size": 128,
+    "device": "cuda",
+    "pool": "B (universe anchor)",
+    "arm": "sealed_zs_fold45"
+  },
+  "code_sha256": {
+    "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+    "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+    "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+    "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+    "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+    "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+  },
+  "scores_sha256": "e30c921f5b0e907a464f917fcb88887ce7a507d842dfcf2b68f6d3803add81f3",
+  "scores_rows": 184447,
+  "limit_obs": 0,
+  "score_nan_share": 0.0,
+  "extrapolated_share": 0.0,
+  "sealed_utc": "2026-09-03T11:07:36+00:00",
+  "authorisation": "2026-09-02 用户授权：仅允许 FT 固定配置训练与 FT/ZS 打分；不得生成/读取 labels，不得计算任何 IC/收益/分层/年度/组合指标，不得人工打开 scores。计算不视为消耗确认集；读取须另行授权。"
+}
