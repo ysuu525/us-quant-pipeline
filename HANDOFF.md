@@ -848,6 +848,12 @@ IC 在物理上算不出来」——**这是错的**。有 `scores.parquet` 和�
 | TSFM | **Rahimikia 未评测 Kronos**（§2 已更正）；Kronos 零独立复现；STRATA 规范：打分先对 8 价量风格因子残差化再算 rank IC；TSFMAudit 无金融数据 | 加 **E8：STRATA 式分数残差化后的 IC**（K6b 是收益层张成，STRATA 是分数层残差化，两者并报）；污染不对称处理是诚实做法 |
 | 引用更正 | Di Mascio-Lines-**Naik**（非 Pedersen）；Harvey-Liu 2020 "Missed"；Bailey-LdP 2015 J. Risk；Fitzgibbons 2017 JoI | 仓库文档经 grep 无前三处错误（错在助手对话）；第四处已由合成规则报告更正 |
 
+### 12.10 实验指令（给 GPT/Codex 执行，09-04）
+
+`docs/实验指令_2026-09-04.md`：总则（封存铁律、只读开发折、判据先写、不调参、不改冻结文件、草稿登记到 `experiments/ledger_drafts_gpt_2026-09-04.md`、精确路径 git）+ 五条实验：**0** DlyOpen 缺失率/口径核查；**1** 信号#2 准入读数（前置：`signal2_prereg_v2.md` 已登记）；**2** 分数加权 vs 等权（**盲功效关先行**，SESOI 0.50bp/日，MDE>SESOI 则不揭盲按先验取等权）；**3** E1 采样数曲线（GPU 夜跑，sc=20 全折 + sc=10/40 三折）；**4** E8 STRATA 分数残差化 IC；**5** K13 按 NT=5 重跑（加 `--nt`，默认对拍）。暂不做：H3/E3（需生成 2005–2020 标签，违反封存授权，待用户授权）、E2（另立）、任何合成在 36–42 的收益。
+
+**C1 已裁定**（ledger 09-03 DECISION）：合成 = 逐日等权秩相加；准入检查替代 IC 三档；缺失 >31 日按单臂；三条披露。预注册 v2 由 opus 撰写中。
+
 ### 12.7 原始规则审视（`docs/审视_原始规则_2026-09-03.md`，用户 09-03 要求）
 
 逐条核对预注册 v1 与登记簿前 130 行后的硬发现：
