@@ -6,18 +6,23 @@
 数据上比**。CLAUDE.md §二.B 层：变体 A vs 变体 B 在本样本量下不可回答，
 只能按写死的优先序选，选择记为**披露的设计假设**，不是发现。
 
-本模块出现的所有常数（`keep_frac=0.50`、`stale_days=21`）都是
+本模块出现的所有常数（`keep_frac=0.50`、`slow_filter` 的 `stale_days=21`、
+`rank_sum_equal_weight` 的 `stale_days=31`）都是
 **预注册值，不是可调参数**：
 
 - `keep_frac=0.50`——「一半」是无参考点默认（1/N 家族），调研 B §四 明列为
   「唯一常数 50%」；
-- `stale_days=21`——一个日历月的交易日数，慢信号按月频更新时「上一期还没到
-  就算陈旧」的自然边界；
+- `slow_filter(stale_days=21)`——一个日历月的**交易日**数，慢信号按月频更新时
+  「上一期还没到就算陈旧」的自然边界；
+- `rank_sum_equal_weight(stale_days=31)`——**日历日**，`experiments/
+  signal2_prereg_v2.md` §4a.1 写死的缺失/陈旧门（与信号#2 规格里的
+  `MAX_SPAN_DAYS=31` 同一个日历先验）。**这两个 `stale_days` 单位不同、
+  出处不同，不可互换**；
 - 秩相加的权重 0.5/0.5——上游默认 1/N。调研 B 实测：ρ=0.2 时等权相对最优
   权重只损失 0.03–3.3%，而本项目「看数据估权」的偏差是 +0.0070，比等权的
   损失大一个量级。
 
-**这三个数不得在任何评估折上调**（开发折 36–42 也不行——它们已被消耗，
+**这几个数不得在任何评估折上调**（开发折 36–42 也不行——它们已被消耗，
 在上面调参会把已经 20–28% 的选择偏差账继续放大）。若将来必须改，走预注册
 修订流程并在 `experiments/ledger.md` 记「修订发生在看到结果之后」。
 
@@ -48,20 +53,58 @@ def _day_series(g: pd.DataFrame) -> pd.Series:
     return pd.Series(g["score"].to_numpy(), index=pd.Index(g["PERMNO"].to_numpy(), name="PERMNO"))
 
 
-def rank_sum_equal_weight(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
-    """逐日秩相加合成（等权）。**零自由参数**。
+def rank_sum_equal_weight(
+    a: pd.DataFrame,
+    b: pd.DataFrame,
+    *,
+    stale_days: int = 31,
+) -> pd.DataFrame:
+    """逐日秩相加合成（等权）+ 缺失/陈旧回退单臂分。**零自由参数**。
 
-    规则（先验固定，不在评估折上调）：
-    1. 只在两条信号**当日都有分数**的名字上合成；任一侧缺失的名字丢弃。
-       日子只在一侧出现的也整天丢弃。
-    2. 各自在共同名字集上转百分位秩 `rank(pct=True)`（默认 `method='average'`，
-       并列取平均秩），**先取交集再排秩**——先排秩再取交集会让秩依赖于被丢掉
-       的名字。
-    3. 合成分数 = `0.5 * (rank_a + rank_b)`。权重 0.5/0.5 是上游默认 1/N，
-       **是预注册常数，不是拟合出来的**。
+    口径来源：`experiments/signal2_prereg_v2.md` §4a.1 / §4a.2（已裁定，
+    不由数据选）。**本函数是不对称的**：`a` 是**基准臂 / Kronos**（定义当日
+    名字全集，也是回退时用的那一臂），`b` 是**信号#2**（只在其有效子集上排秩）。
 
-    对称性：`rank_sum_equal_weight(a, b)` 与 `rank_sum_equal_weight(b, a)`
-    的输出逐位相同（IEEE 加法可交换，输出按 (signal_date, PERMNO) 排序）。
+    规则（先验固定，不在评估折上调）
+    --------------------------------
+    记 `N_t` = 当日 `a` 有分数的名字全集（现状口径：top500 且有 Kronos 分数），
+    `V_t ⊆ N_t` = 其中信号#2 **有效**的名字。信号#2 在名字 i 于日 t 上有效 ⟺
+    存在日期 `s <= t` 使 `b` 在 (s, i) 上有非 NaN 分数，且 `(t − s)` 不超过
+    `stale_days` 个**日历日**（取最近的那个 `s`，其分数前推到 t 使用）。
+
+    1. `pct_rank_t(a)` 在 **`N_t`** 上算（全体名字同一把尺）；
+       `pct_rank_t(b)` 在 **`V_t`** 上算。两者都用 `rank(pct=True)`
+       （默认 `method='average'`，并列取平均秩），取值落在 (0, 1]。
+    2. `i ∈ V_t`：`score = 0.5 * (rk_a^{N_t}[i] + rk_b^{V_t}[i])`；
+       `i ∈ N_t \\ V_t`：`score = rk_a^{N_t}[i]`（**回退单臂分**）。
+       后者等价于「信号#2 恰好与 `a` 的百分位秩一致」的中性处理：缺失的名字
+       既不被驱逐出可持有集，也不因缺失获得排名优势（v2 §4a.2 性质 2）。
+    3. 权重 0.5/0.5 是上游默认 1/N，**是预注册常数，不是拟合出来的**。
+
+    `stale_days=31`（**日历日**）是 `experiments/signal2_prereg_v2.md` §4a.1 的
+    **预注册常数，不得调**（v2 §5 不做清单：「不调 …/ 陈旧门 31 日」）。
+    注意与 `slow_filter` 的 `stale_days=21` **不是同一个量**：那个是**交易日**，
+    出处是调研 B §四，两者不可互换。做成关键字参数只为让测试能打边界，
+    **不是给调用方调的旋钮**。
+
+    退化与兼容
+    ----------
+    - `V_t = N_t`（无缺失、无陈旧）时，本式**逐位退化**为旧语义
+      「先取交集再排秩、`0.5*(ra+rb)`」——旧实现是本实现的特例
+      （v2 §4a.2 性质 1，`tests/test_portfolio.py::test_rank_sum_degenerates_...`）。
+    - 签名向后兼容：`a`/`b` 仍为前两个位置参数，`stale_days` 是新增关键字参数。
+    - **不再对称**：`b` 只在 `V_t` 上排秩、`a` 定义 `N_t`，所以
+      `f(a, b) != f(b, a)`。旧 docstring 承诺的对称性随 v2 §4a 作废。
+    - **只在一侧出现的日子**：`a` 有而 `b` 无（或 `b` 全部陈旧）的日子**保留**，
+      整天回退成 `a` 的秩（旧语义是整天丢弃）；`b` 有而 `a` 无的日子仍丢弃
+      （`N_t` 由 `a` 定义，没有 `a` 就没有名字集）。
+
+    返回
+    ----
+    `DataFrame[signal_date, PERMNO, score, used_signal2]`，按
+    (signal_date, PERMNO) 排序。`used_signal2` 为 bool：该行是否真的用上了
+    信号#2（即 `i ∈ V_t`）。下游 `scores_frame_to_by_day` 只取前三列，多出来
+    的诊断列不影响构造。
 
     注意：合成分数落在 [0, 1]，与单臂分数不同量纲。下游只用它的**名次**
     （`frozen_long_only_returns` 只看 `rank`），所以量纲无关；但不要拿它和
@@ -69,30 +112,44 @@ def rank_sum_equal_weight(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
 
     调研 B 的止损点（`docs/调研_合成与验证设计_2026-09-03.md` §四）：秩相加
     要不稀释，需 IC₂ > IC₁ × (√(2(1+ρ)) − 1) ≈ 0.0085（IC₁=0.0155, ρ=0.2），
-    且必须是 **6 日标签上的** IC。本函数不做这个检查——它是准入判据，
-    由调用方在预注册的处置表里执行。
+    且必须是 **6 日标签上的** IC。本函数不做这个检查——v2 §4.2 已把量级门
+    从准入规则里删除，0.0085 降为披露中的参考数字。
     """
     a, b = _normalize(a), _normalize(b)
-    bmap = {day: g for day, g in b.groupby("signal_date")}
-    frames = []
-    for day, ga in a.groupby("signal_date"):
-        gb = bmap.get(day)
-        if gb is None:
-            continue
-        sa, sb = _day_series(ga), _day_series(gb)
-        common = sorted(set(sa.index) & set(sb.index))
-        if not common:
-            continue
-        ra = sa.loc[common].rank(pct=True)
-        rb = sb.loc[common].rank(pct=True)
-        frames.append(pd.DataFrame({
-            "signal_date": day,
-            "PERMNO": common,
-            "score": 0.5 * (ra.to_numpy() + rb.to_numpy()),
-        }))
-    if not frames:
-        return pd.DataFrame(columns=COLS)
-    return pd.concat(frames, ignore_index=True)
+    out_cols = COLS + ["used_signal2"]
+    if a.empty:
+        return a.assign(used_signal2=pd.Series(dtype=bool))[out_cols].reset_index(drop=True)
+
+    left = a.sort_values("signal_date", kind="stable").reset_index(drop=True)
+    if b.empty:
+        left["_s2"] = pd.Series(np.nan, index=left.index, dtype=float)
+    else:
+        right = (b.rename(columns={"score": "_s2"})
+                  .sort_values("signal_date", kind="stable")
+                  .reset_index(drop=True))
+        # backward + tolerance = 「最近一次有效值距 signal_date 不超过
+        # stale_days 个日历日」；pandas 的 tolerance 是闭区间（<=）。
+        left = pd.merge_asof(
+            left, right, on="signal_date", by="PERMNO",
+            direction="backward", tolerance=pd.Timedelta(days=int(stale_days)),
+        )
+
+    used = left["_s2"].notna().to_numpy()
+    rk_a = left.groupby("signal_date")["score"].rank(pct=True).to_numpy()
+    rk_b = np.full(len(left), np.nan)
+    if used.any():
+        sub = left.loc[used]
+        rk_b[used] = sub.groupby("signal_date")["_s2"].rank(pct=True).to_numpy()
+    # 0.5*(ra+rb) 与旧实现逐字相同的浮点表达式；回退行直接取 rk_a。
+    score = np.where(used, 0.5 * (rk_a + rk_b), rk_a)
+
+    out = pd.DataFrame({
+        "signal_date": left["signal_date"].to_numpy(),
+        "PERMNO": left["PERMNO"].to_numpy(),
+        "score": score,
+        "used_signal2": used,
+    })
+    return out.sort_values(["signal_date", "PERMNO"], kind="stable").reset_index(drop=True)
 
 
 def slow_filter(

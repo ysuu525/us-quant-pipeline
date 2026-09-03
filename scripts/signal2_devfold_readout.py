@@ -449,7 +449,7 @@ def run(fold_ids: list[int], arms: list[str], processed: Path, outputs: Path,
     report = {
         "meta": {
             "script": "scripts/signal2_devfold_readout.py",
-            "prereg": "experiments/signal2_prereg_v1.md",
+            "prereg": "experiments/signal2_prereg_v2.md",
             "mode": mode,
             "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "elapsed_sec": round(time.time() - t0, 2),

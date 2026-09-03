@@ -242,24 +242,166 @@ def _frame(day_to_scores: dict) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["signal_date", "PERMNO", "score"])
 
 
-def test_rank_sum_is_symmetric():
+# ---- rank_sum_equal_weight：v2 §4a 语义 --------------------------------
+#
+# 2026-09-04 起本组测试按 `experiments/signal2_prereg_v2.md` §4a.1 / §4a.2 重写。
+# v2 §4a.6 明写：旧实现「任一侧缺失的名字丢弃」与 §4a.1 写死的「缺失/陈旧 →
+# 退回 Kronos 单臂分」**不一致**，处置是「实现侧必须把 rank_sum_equal_weight
+# 扩展到 §4a.1 + §4a.2 的语义并补测试」。因此下面三条旧断言按 v2 改：
+#
+# | 旧测试 | 旧断言 | v2 依据 | 现在 |
+# |---|---|---|---|
+# | `test_rank_sum_is_symmetric` | `f(a,b) == f(b,a)` 恒成立 | §4a.2：`a` 定义 `N_t`、`b` 只在 `V_t` 上排秩 → 函数不再对称 | 拆成「名字集相同时仍对称」+「名字集不同时不对称」 |
+# | `test_rank_sum_uses_intersection_only` | 只留交集、单侧日整天丢 | §4a.1：`i ∈ N_t \ V_t → score = rk_kronos`；§4a.2 性质 2「不因缺失被驱逐出可持有集」 | 改为回退断言 |
+# | `test_rank_sum_ranks_after_intersection` | 交集外的名字不影响秩 | §4a.2：`V_t ⊆ N_t`，`b` 里 `N_t` 之外的名字本就不进 `V_t` | 断言不变，理由换成 §4a.2 |
+#
+# 旧语义不是被推翻，是被**推广**：v2 §4a.2 性质 1 要求 `V_t = N_t` 时逐位退化
+# 回旧式，由 `test_rank_sum_degenerates_to_v1_bitwise` 钉死。
+
+
+def _reference_rank_sum_v1(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
+    """`combine.rank_sum_equal_weight` 的**旧实现原样复制**（2026-09-03 版）。
+
+    只用于 `V_t = N_t` 时的逐位退化对拍（v2 §4a.2 性质 1）。一个字符没改，
+    包括 `0.5 * (ra.to_numpy() + rb.to_numpy())` 这个浮点表达式的写法。
+    """
+    from portfolio.combine import COLS as _COLS, _day_series, _normalize
+    a, b = _normalize(a), _normalize(b)
+    bmap = {day: g for day, g in b.groupby("signal_date")}
+    frames = []
+    for day, ga in a.groupby("signal_date"):
+        gb = bmap.get(day)
+        if gb is None:
+            continue
+        sa, sb = _day_series(ga), _day_series(gb)
+        common = sorted(set(sa.index) & set(sb.index))
+        if not common:
+            continue
+        ra = sa.loc[common].rank(pct=True)
+        rb = sb.loc[common].rank(pct=True)
+        frames.append(pd.DataFrame({
+            "signal_date": day,
+            "PERMNO": common,
+            "score": 0.5 * (ra.to_numpy() + rb.to_numpy()),
+        }))
+    if not frames:
+        return pd.DataFrame(columns=_COLS)
+    return pd.concat(frames, ignore_index=True)
+
+
+def test_rank_sum_is_symmetric_when_name_sets_match():
+    """名字集完全相同 → `V_t = N_t`，两边同一把尺，IEEE 加法可交换 → 仍对称。"""
     rng = np.random.default_rng(11)
     a = _frame({"2021-01-04": dict(zip(range(1, 21), rng.normal(size=20))),
                 "2021-01-05": dict(zip(range(1, 21), rng.normal(size=20)))})
-    b = _frame({"2021-01-04": dict(zip(range(5, 25), rng.normal(size=20))),
-                "2021-01-05": dict(zip(range(5, 25), rng.normal(size=20)))})
+    b = _frame({"2021-01-04": dict(zip(range(1, 21), rng.normal(size=20))),
+                "2021-01-05": dict(zip(range(1, 21), rng.normal(size=20)))})
     ab = rank_sum_equal_weight(a, b)
     ba = rank_sum_equal_weight(b, a)
     pd.testing.assert_frame_equal(ab, ba, check_exact=True)
 
 
-def test_rank_sum_uses_intersection_only():
-    a = _frame({"2021-01-04": {1: 0.1, 2: 0.2, 3: 0.3},
-                "2021-01-05": {1: 0.5}})                 # 这天 b 没有 → 整天丢
+def test_rank_sum_is_asymmetric_when_name_sets_differ():
+    """v2 §4a.2：`a` 定义 `N_t`、`b` 只在有效子集 `V_t` 上排秩 → **故意不对称**。
+
+    旧 docstring 承诺的无条件对称性随 v2 §4a 作废；这条测试把作废钉死，
+    免得日后有人「修好」这个不对称。
+    """
+    a = _frame({"2021-01-04": {1: 0.1, 2: 0.2, 3: 0.3}})
     b = _frame({"2021-01-04": {2: 9.0, 3: 8.0, 4: 7.0}})
+    ab = rank_sum_equal_weight(a, b)
+    ba = rank_sum_equal_weight(b, a)
+    assert set(ab["PERMNO"]) == {1, 2, 3}       # N_t 由 a 定义
+    assert set(ba["PERMNO"]) == {2, 3, 4}       # N_t 由 b 定义
+    assert len(ab) == len(ba) == 3
+    assert not ab["score"].to_numpy().tolist() == ba["score"].to_numpy().tolist()
+
+
+def test_rank_sum_missing_signal2_falls_back_to_single_arm():
+    """v2 §4a.1：`i ∈ N_t \\ V_t → score_combo = pct_rank_t(score_kronos)`。
+
+    旧语义把这些名字丢弃（v2 §4a.6 明列为与预注册**不一致**的实现缺陷）。
+    """
+    a = _frame({"2021-01-04": {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0}})
+    b = _frame({"2021-01-04": {2: 9.0, 3: 8.0}})      # 只有 2、3 有信号#2
     out = rank_sum_equal_weight(a, b)
-    assert set(out["PERMNO"]) == {2, 3}
-    assert set(out["signal_date"]) == {pd.Timestamp("2021-01-04")}
+    assert list(out.columns) == ["signal_date", "PERMNO", "score", "used_signal2"]
+    assert set(out["PERMNO"]) == {1, 2, 3, 4}, "N_t 的名字一个都不许丢"
+    used = dict(zip(out["PERMNO"], out["used_signal2"]))
+    assert used == {1: False, 2: True, 3: True, 4: False}
+    s = dict(zip(out["PERMNO"], out["score"]))
+    # rk_a 在 N_t={1,2,3,4} 上 = .25/.50/.75/1.00
+    # rk_b 在 V_t={2,3} 上：b 里 2 的分更高 → 2→1.0、3→0.5
+    assert s[1] == pytest.approx(0.25)                 # 回退单臂分
+    assert s[4] == pytest.approx(1.00)                 # 回退单臂分
+    assert s[2] == pytest.approx(0.5 * (0.50 + 1.0))
+    assert s[3] == pytest.approx(0.5 * (0.75 + 0.5))
+
+
+def test_rank_sum_carries_signal2_forward_then_falls_back_whole_day():
+    """信号#2 只在部分日子有观测 → 31 日内前推使用，超期整天回退单臂分。
+
+    - `2021-01-05`：距 b 的 01-04 只有 1 个日历日 → 前推使用（`used=True`）；
+    - `2021-03-01`：距 01-04 有 56 个日历日 → 整天回退（`used=False`），
+      **但名字一个不丢**（旧语义会整天丢弃）；
+    - `b` 有而 `a` 无的 `2021-06-30`：仍然丢——`N_t` 由 `a` 定义。
+    """
+    a = _frame({"2021-01-04": {1: 0.1, 2: 0.2, 3: 0.3},
+                "2021-01-05": {1: 0.5, 2: 0.4, 3: 0.3},
+                "2021-03-01": {1: 0.5, 2: 0.4, 3: 0.3}})
+    b = _frame({"2021-01-04": {1: 9.0, 2: 8.0, 3: 7.0},
+                "2021-06-30": {1: 1.0, 2: 2.0, 3: 3.0}})
+    out = rank_sum_equal_weight(a, b)
+    assert set(out["signal_date"]) == {pd.Timestamp("2021-01-04"),
+                                       pd.Timestamp("2021-01-05"),
+                                       pd.Timestamp("2021-03-01")}
+    got = {d: g["used_signal2"].tolist()
+           for d, g in out.groupby("signal_date")}
+    assert got[pd.Timestamp("2021-01-04")] == [True, True, True]
+    assert got[pd.Timestamp("2021-01-05")] == [True, True, True]   # 前推 1 日
+    assert got[pd.Timestamp("2021-03-01")] == [False, False, False]  # 56 日，陈旧
+    d3 = out[out["signal_date"] == pd.Timestamp("2021-03-01")]
+    assert np.allclose(d3["score"].to_numpy(), [1.0, 2 / 3, 1 / 3])  # = rk_a
+
+
+def test_rank_sum_stale_gate_is_31_calendar_days():
+    """v2 §4a.1 的陈旧门：**最近一次有效值距 signal_date 不超过 31 个日历日**。
+
+    31 是预注册常数（v2 §5 不做清单：「不调 … 陈旧门 31 日」），这里只打边界，
+    不是在调它。闭区间：恰好 31 日仍有效。
+    """
+    b = _frame({"2021-01-01": {1: 4.0, 2: 3.0, 3: 2.0, 4: 1.0}})
+    names = {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0}
+    # a 与 b 的名次完全相反 → 有效时合成分全等于 0.625（秩和守恒）
+    for day, valid in [("2021-01-31", True),    # 30 个日历日 → 有效
+                       ("2021-02-01", True),    # 31 个日历日 → 边界，仍有效
+                       ("2021-02-02", False)]:  # 32 个日历日 → 陈旧
+        out = rank_sum_equal_weight(_frame({day: names}), b)
+        assert set(out["PERMNO"]) == {1, 2, 3, 4}, f"{day}: 名字被丢了"
+        assert bool(out["used_signal2"].all()) is valid, f"{day}: 陈旧门判错"
+        assert bool(out["used_signal2"].any()) is valid, f"{day}: 陈旧门判错"
+        if valid:
+            assert np.allclose(out["score"].to_numpy(), 0.625)
+        else:
+            # 回退单臂分 = a 在 N_t 上的百分位秩
+            assert np.allclose(out["score"].to_numpy(), [0.25, 0.5, 0.75, 1.0])
+
+
+def test_rank_sum_stale_days_is_a_parameter_not_a_hardcode():
+    """`stale_days` 是关键字参数（测试要能打边界），但默认值 31 是预注册常数。"""
+    import inspect
+
+    from portfolio.combine import rank_sum_equal_weight as f
+    sig = inspect.signature(f)
+    assert sig.parameters["stale_days"].default == 31
+    assert sig.parameters["stale_days"].kind is inspect.Parameter.KEYWORD_ONLY
+    # 前两个参数仍是位置参数 → 签名向后兼容
+    assert [p for p, v in sig.parameters.items()
+            if v.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD] == ["a", "b"]
+    b = _frame({"2021-01-01": {1: 4.0, 2: 3.0, 3: 2.0, 4: 1.0}})
+    a = _frame({"2021-02-02": {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0}})   # 32 个日历日
+    assert not rank_sum_equal_weight(a, b)["used_signal2"].any()
+    assert rank_sum_equal_weight(a, b, stale_days=32)["used_signal2"].all()
 
 
 def test_rank_sum_opposite_signals_cancel():
@@ -267,11 +409,15 @@ def test_rank_sum_opposite_signals_cancel():
     a = _frame({"2021-01-04": {10: 1.0, 20: 2.0, 30: 3.0}})
     b = _frame({"2021-01-04": {10: 3.0, 20: 2.0, 30: 1.0}})
     out = rank_sum_equal_weight(a, b)
+    assert out["used_signal2"].all()
     assert np.allclose(out["score"].to_numpy(), 2.0 / 3.0)
 
 
-def test_rank_sum_ranks_after_intersection():
-    """先取交集再排秩：b 里多出来的名字不得影响交集内的秩。"""
+def test_rank_sum_ranks_only_within_the_valid_subset():
+    """v2 §4a.2：`V_t ⊆ N_t`——`b` 里 `N_t` 之外的名字不进 `V_t`，也不影响秩。
+
+    （旧测试名为 `..._ranks_after_intersection`，断言不变，理由换成 §4a.2。）
+    """
     a = _frame({"2021-01-04": {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0}})
     b_small = _frame({"2021-01-04": {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0}})
     b_big = _frame({"2021-01-04": {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0,
@@ -279,6 +425,52 @@ def test_rank_sum_ranks_after_intersection():
     o1 = rank_sum_equal_weight(a, b_small)
     o2 = rank_sum_equal_weight(a, b_big)
     pd.testing.assert_frame_equal(o1, o2, check_exact=True)
+
+
+@pytest.mark.parametrize("seed", [20260904, 3, 777])
+def test_rank_sum_degenerates_to_v1_bitwise(seed):
+    """v2 §4a.2 性质 1：`V_t = N_t` 时**逐位退化**为旧语义。
+
+    判据 `np.array_equal`（不是 `allclose`）——新式必须是旧式的严格推广，
+    合成分不许动最后一位，否则此前所有基于旧式的读数都不可比。
+    """
+    rng = np.random.default_rng(seed)
+    days = pd.bdate_range("2021-01-04", periods=12)
+    names = list(range(101, 141))
+    # 同名字集、同日集 → V_t = N_t。分数取两位小数 → 大量并列，逼出
+    # rank(method='average') 的并列处理。
+    a = _frame({d: dict(zip(names, np.round(rng.normal(size=len(names)), 2)))
+                for d in days})
+    b = _frame({d: dict(zip(names, np.round(rng.normal(size=len(names)), 2)))
+                for d in days})
+    new = rank_sum_equal_weight(a, b)
+    ref = _reference_rank_sum_v1(a, b)
+    assert new["used_signal2"].all(), "V_t = N_t 时不该有任何回退行"
+    assert list(new["signal_date"]) == list(ref["signal_date"])
+    assert list(new["PERMNO"]) == list(ref["PERMNO"])
+    assert np.array_equal(new["score"].to_numpy(), ref["score"].to_numpy()), \
+        "score 列非逐位相同"
+
+
+def test_rank_sum_empty_inputs():
+    empty = _frame({})
+    a = _frame({"2021-01-04": {1: 1.0, 2: 2.0}})
+    out = rank_sum_equal_weight(a, empty)
+    assert list(out.columns) == ["signal_date", "PERMNO", "score", "used_signal2"]
+    assert not out["used_signal2"].any()
+    assert np.allclose(out["score"].to_numpy(), [0.5, 1.0])   # 全部回退单臂分
+    assert rank_sum_equal_weight(empty, a).empty
+
+
+def test_rank_sum_output_feeds_construction_unchanged():
+    """多出来的 `used_signal2` 列不得影响下游构造（三列契约）。"""
+    rng = np.random.default_rng(5)
+    names = list(range(1, 61))
+    a = _frame({"2021-01-04": dict(zip(names, rng.normal(size=len(names))))})
+    b = _frame({"2021-01-04": dict(zip(names[:30], rng.normal(size=30)))})
+    out = rank_sum_equal_weight(a, b)
+    by_day = scores_frame_to_by_day(out, min_names=50)
+    assert len(by_day[pd.Timestamp("2021-01-04")]) == 60
 
 
 def test_slow_filter_keep_frac_boundary():
