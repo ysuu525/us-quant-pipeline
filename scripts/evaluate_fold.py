@@ -109,10 +109,11 @@ def main() -> None:
     hi = cal.dates[end_idx]
 
     log(f"评估窗 [{val_start.date()} .. {val_end.date()}]  切片 [{lo.date()} .. {hi.date()}]")
-    adj = pd.read_parquet(P / "panel_kronos_adj.parquet")
-    adj = adj[(adj["DlyCalDt"] >= lo) & (adj["DlyCalDt"] <= hi)]
+    date_filters = [("DlyCalDt", ">=", lo), ("DlyCalDt", "<=", hi)]
+    adj = pd.read_parquet(P / "panel_kronos_adj.parquet", filters=date_filters)
     uni = pd.read_parquet(P / "universe.parquet",
-                          columns=["PERMNO", "DlyCalDt", "in_universe"])
+                          columns=["PERMNO", "DlyCalDt", "in_universe"],
+                          filters=date_filters)
 
     log("构建打分索引（lookback 侧连续有效 + anchor 在 universe 内）...")
     sidx = build_scoring_index(adj, cal, args.lookback)
@@ -188,8 +189,8 @@ def main() -> None:
     raw = pd.read_parquet(
         P / "panel_raw.parquet",
         columns=["PERMNO", "DlyCalDt", "DlyOpen", "DlyClose", "DlyRet",
-                 "DlyDelFlg", "DlyCap", "DlyPrcVol"])
-    raw = raw[(raw["DlyCalDt"] >= lo) & (raw["DlyCalDt"] <= hi)]
+                 "DlyDelFlg", "DlyCap", "DlyPrcVol"],
+        filters=date_filters)
     dist = pd.read_parquet(P / "distributions.parquet",
                            columns=["permno", "disexdt", "disdivamt"])
     cash = dist[dist["disdivamt"].fillna(0) > 0].rename(
