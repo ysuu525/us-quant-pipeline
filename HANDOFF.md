@@ -741,7 +741,7 @@ IC 在物理上算不出来」——**这是错的**。有 `scores.parquet` 和�
 
 **进行中 / 待办**：
 1. ✅ `scripts/preregistration_manifest.py`（sha256 清单 + `--verify`，收 8 固定文件 + 67 个 `SEALED_MANIFEST.json`；OTS / OSF / 签名 tag 三条路径写在 `--help`）与实验指令补充 6–12 已提交；总则 11–13 条完好；`test_sealed_mode` + `test_prereg_manifest` 159 passed。**agent 顺带发现**：(a) 打分路径无随机种子（`evaluate_fold.py` / `infer.py` 无 `manual_seed`）→ 现有分数**不可逐位复现**，实验 9 的 test–retest 无需改代码，但论文局限要写；(b) 封存清单 glob 收进一个 `..._smoke_fold36` 冒烟残留目录，锚定前决定排除或清理；(c) 树基线逐日 IC 产物存在于 `outputs/gbdt_strong_jkp_v2/*/daily_ic_*.parquet`，实验 7 零成本；(d) `train_rank_head.py` 无 `--fold`，实验 8 须经 `emit_folds.py` 取四个日期；(e) 行业中性化可复用 `xsec_context_probe.py:126-150` 的 point-in-time SIC2。
-2. **解封前必做**（模拟审稿 C9）：用 manifest 脚本生成清单 → OpenTimestamps 或 OSF 锚定 → 签名 tag 推公开 remote。用户亲手做。
+2. ~~**解封前必做**（模拟审稿 C9）~~ **第一章已完成（09-04）**：tag `prereg-2026-09-03b`、`experiments/preregistration_manifest_20260903T131201Z.json`（self_sha256 `150c2e4d3c4b…`）+ `.ots`，对 tag 检出 `--verify` 76/76 unchanged。**待办**：(i) 比特币区块确认后跑 `ots upgrade` + `ots verify` 拿到区块时间；(ii) **第二章**——协议 v4 定稿后重新生成清单并再盖一次章（v4 才是解封的实际闸门，只盖一次会把它漏在时间戳外）；(iii) 仓库是 private，**push 不是外部证据**，解封后须公开仓库或另交快照。详见 ledger 09-04 两条 pre-registration。
 3. 用户待答：折 05–35 内一次年代分解（2005–2012 vs 2013–2020，估计交付）采不采纳；审稿 §6 的 ④⑤⑥⑦ 不急。
 4. GPT 可立即跑实验指令第 0、1、2 条；第 3 条（GPU 16h）夜跑；补充 6–12 等 opus 回来。
 5. 小试协议 v2（单臂、NT=5、费用双边、基准改官方竞价印价、TAF 50,206、取整规则、Alpaca 606 路由追问）待写；依赖用户 AUM 与 Alpaca 答复。
