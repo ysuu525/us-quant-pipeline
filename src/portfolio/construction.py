@@ -81,7 +81,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-__all__ = ["frozen_long_only_returns", "scores_frame_to_by_day"]
+__all__ = [
+    "frozen_long_only_returns",
+    "frozen_long_only_returns_weighted",
+    "scores_frame_to_by_day",
+]
 
 
 def scores_frame_to_by_day(df: pd.DataFrame, min_names: int = 50) -> dict:
@@ -192,3 +196,124 @@ def frozen_long_only_returns(
     return (pd.DataFrame(rows, columns=["date", "r", "turn", "n_names"])
             .set_index("date")
             .sort_index())
+
+
+def _linear_rank_weights(names: list, pct: dict) -> dict:
+    """所选名字内按当前分数名次赋 ``k, ..., 1``，并归一化。"""
+    # 并列分数沿用冻结构造 `order` 的稳定 tie-break：当前分数字典插入顺序。
+    position = {p: i for i, p in enumerate(pct)}
+    ranked = sorted(names, key=lambda p: (-pct[p], position[p]))
+    k = len(ranked)
+    denom = k * (k + 1) / 2.0
+    return {p: (k - i) / denom for i, p in enumerate(ranked)}
+
+
+def _weight_turnover(previous: dict, current: dict) -> float:
+    """新旧套袖权重向量的半 L1 距离。"""
+    names = set(previous) | set(current)
+    return 0.5 * sum(abs(current.get(p, 0.0) - previous.get(p, 0.0)) for p in names)
+
+
+def frozen_long_only_returns_weighted(
+    scores_by_day: dict,
+    ret_by_day: dict,
+    oc_by_day: dict,
+    adv_by_day: dict,
+    *,
+    topn: int = 500,
+    cost_bp: float = 8.0,
+    exit_pct: float = 0.30,
+    nt: int = 6,
+    min_names: int = 50,
+    weighting: str = "equal",
+) -> pd.DataFrame:
+    """本函数仅供实验 2，不是冻结构造。
+
+    ``weighting="equal"`` 直接委托 :func:`frozen_long_only_returns`，保证默认
+    等权路径的收益、换手和浮点运算逐位不变。``weighting="rank"`` 仅改变套袖
+    内权重：所选 ``k`` 只股票按当前分数从高到低取线性名次分 ``k, ..., 1``；
+    套袖权重换手为新旧权重向量的 ``sum(abs(delta_w)) / 2``。套袖间仍等权，
+    建仓时点、fresh 名字的 open-to-close 收益、基准与成本公式均沿用冻结构造。
+    """
+    if weighting == "equal":
+        return frozen_long_only_returns(
+            scores_by_day,
+            ret_by_day,
+            oc_by_day,
+            adv_by_day,
+            topn=topn,
+            cost_bp=cost_bp,
+            exit_pct=exit_pct,
+            nt=nt,
+            min_names=min_names,
+        )
+    if weighting != "rank":
+        raise ValueError("weighting 必须是 'equal' 或 'rank'")
+
+    ret, oc, adv = ret_by_day, oc_by_day, adv_by_day
+    by_day = {d: s for d, s in scores_by_day.items() if len(s) >= min_names}
+    rows = []
+    days = sorted(by_day)
+    book = [None] * nt
+    for i, day in enumerate(days):
+        s, a = by_day[day], adv.get(day, {})
+        elig = [p for p in s if p in a and np.isfinite(a[p])]
+        if topn and len(elig) > topn:
+            elig = sorted(elig, key=lambda p: -a[p])[:topn]
+        elig = set(elig)
+        s = {p: v for p, v in s.items() if p in elig}
+        n = len(s)
+        if n < min_names:
+            continue
+        pct = (pd.Series(s).rank() / n).to_dict()
+        k = max(1, n // 10)
+        order = sorted(pct, key=lambda p: -pct[p])
+        j = i % nt
+        prev = book[j]
+        if prev is None:
+            nb, fresh = list(order[:k]), set(order[:k])
+            weights = _linear_rank_weights(nb, pct)
+            turn = 0.0
+        else:
+            keep = [
+                p for p in prev["names"] if p in pct and pct[p] >= 1 - exit_pct
+            ][:k]
+            held = set(keep)
+            add = [p for p in order if p not in held][: k - len(keep)]
+            nb, fresh = keep + add, set(add)
+            weights = _linear_rank_weights(nb, pct)
+            turn = _weight_turnover(prev["weights"], weights)
+        book[j] = {"names": nb, "weights": weights}
+        if i + 1 >= len(days) or i < nt:
+            continue
+        nd = days[i + 1]
+        rm, om = ret.get(nd, {}), oc.get(nd, {})
+        if not rm:
+            continue
+        cost = 2.0 * (cost_bp / 1e4) * turn / nt
+        vals = []
+        for t in range(nt):
+            sleeve = book[t]
+            if not sleeve:
+                continue
+            sleeve_returns = []
+            sleeve_weights = []
+            for p in sleeve["names"]:
+                value = om.get(p) if (t == j and p in fresh) else rm.get(p)
+                if value is not None and np.isfinite(value):
+                    sleeve_returns.append(value)
+                    sleeve_weights.append(sleeve["weights"][p])
+            if sleeve_returns:
+                vals.append(float(np.average(sleeve_returns, weights=sleeve_weights)))
+        if not vals:
+            continue
+        bench = float(np.mean([rm[p] for p in pct if p in rm]))
+        n_names = len(
+            {p for sleeve in book if sleeve for p in sleeve["names"]}
+        )
+        rows.append((nd, float(np.mean(vals)) - bench - cost, turn, n_names))
+    return (
+        pd.DataFrame(rows, columns=["date", "r", "turn", "n_names"])
+        .set_index("date")
+        .sort_index()
+    )
