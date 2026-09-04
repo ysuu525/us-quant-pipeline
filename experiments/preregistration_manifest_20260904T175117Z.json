@@ -1,0 +1,592 @@
+{
+  "schema": "preregistration_manifest/v1",
+  "purpose": "解封（读取折 05–35）之前对协议/登记簿/封存清单做哈希存证；外部时间戳由 OpenTimestamps / OSF 手工锚定，见脚本 docstring。",
+  "generated_utc": "2026-09-04T17:51:17+00:00",
+  "repo_root": "F:\\quant\\us-quant-pipeline",
+  "tool": {
+    "script": "scripts/preregistration_manifest.py",
+    "script_sha256": "a9a51857672d001a74bbd7c13e476af990d4ab3001c47f9e300fc22546e6fd1f"
+  },
+  "git": {
+    "available": true,
+    "head": "2b6fd069db28018b1f4972cf4cc2df5e7a14d67d",
+    "head_short": "2b6fd069db28",
+    "branch": "phase5-ablations-and-monetization",
+    "dirty": true,
+    "n_changed": 12,
+    "status_summary": {
+      "??": 6,
+      "M": 6
+    },
+    "status_porcelain": [
+      "M scripts/exp11_spanning_extended.py",
+      " M scripts/gbdt_baseline.py",
+      " M scripts/ict_pattern_probe.py",
+      " M src/crsp_pipeline/sealed.py",
+      " M src/signals/kronos_adapter.py",
+      " M third_party/kronos",
+      "?? configs/gbdt_strong_v2_sealed.json",
+      "?? scripts/build_jkp_state_snapshot.py",
+      "?? scripts/gbdt_sealed_smoke.py",
+      "?? scripts/run_gbdt_sealed_queue.ps1",
+      "?? src/unseal/",
+      "?? tests/test_gbdt_sealed.py"
+    ],
+    "status_porcelain_sha256": "820db3b5b894a8a82690bba4eec308911cde07386dc090c5f9a0cdc3217d8084"
+  },
+  "files": [
+    {
+      "path": "experiments/ledger.md",
+      "status": "ok",
+      "sha256": "56d85d92dfc9e9089bab89a2f6e819ae18c01f713f5f05ef09014527d4b84533",
+      "bytes": 281671,
+      "mtime_utc": "2026-09-04T17:50:10+00:00"
+    },
+    {
+      "path": "experiments/confirmation_protocol_v3.md",
+      "status": "ok",
+      "sha256": "ad21f2d1f17eac6c618756c92ecc323b2d262f6d33f22e41d090272287301810",
+      "bytes": 7805,
+      "mtime_utc": "2026-09-01T03:21:51+00:00"
+    },
+    {
+      "path": "experiments/confirmation_protocol_v4.md",
+      "status": "ok",
+      "sha256": "c3c823e2189f53137f158c04dca6240022a03774e28a57388c3556fd65bcfe3d",
+      "bytes": 85121,
+      "mtime_utc": "2026-09-04T17:38:45+00:00"
+    },
+    {
+      "path": "experiments/confirmation_protocol_v4_revisions.md",
+      "status": "ok",
+      "sha256": "7ecc0dc619ebc69b74802bc909e2263828223f6a80cb60b97c7a77ab0ae23a4a",
+      "bytes": 7427,
+      "mtime_utc": "2026-09-01T03:19:03+00:00"
+    },
+    {
+      "path": "experiments/signal2_prereg_v2.md",
+      "status": "ok",
+      "sha256": "4f21541a5d55fcb057eb09788dd7f87bc920d25c66c26462294c56622d6c696e",
+      "bytes": 53660,
+      "mtime_utc": "2026-09-03T12:28:04+00:00"
+    },
+    {
+      "path": "experiments/ict_pattern_probe_prereg_v1.md",
+      "status": "ok",
+      "sha256": "5b21ed2048b2d2dc0c80459fed832ccf915bc78ed8c685329c1d82fadf3507f5",
+      "bytes": 8726,
+      "mtime_utc": "2026-09-04T15:05:59+00:00"
+    },
+    {
+      "path": "experiments/cost_pilot_protocol_v1_draft.md",
+      "status": "ok",
+      "sha256": "d1279726c24f78c6d16cf1c87f73d756dd4fe2d8af1734e695829cf2a0c8f826",
+      "bytes": 13182,
+      "mtime_utc": "2026-09-01T05:51:06+00:00"
+    },
+    {
+      "path": "CLAUDE.md",
+      "status": "ok",
+      "sha256": "760e8e2c65c7bdee2277e63bada0e9c8c72b6c7060ab84efeef085c66ff926af",
+      "bytes": 13240,
+      "mtime_utc": "2026-09-03T12:27:10+00:00"
+    },
+    {
+      "path": "HANDOFF.md",
+      "status": "ok",
+      "sha256": "dc6549bca71c9b8f7ae2d2480e0288cd96055e888960226e3641a5ea19e84e28",
+      "bytes": 18989,
+      "mtime_utc": "2026-09-04T17:49:45+00:00"
+    },
+    {
+      "path": "third_party/kronos_local.patch",
+      "status": "ok",
+      "sha256": "68bae5086a836d72037eead9ad39a584880dfca417835b3616849db829df0e5d",
+      "bytes": 594,
+      "mtime_utc": "2026-09-03T13:00:41+00:00"
+    },
+    {
+      "path": "docs/研究计划书_v0.2_2026-09-04.md",
+      "status": "ok",
+      "sha256": "7b2a131b31c6f576fc668735fe4ae49881c2bb579bf3b95fec3c4728457a0353",
+      "bytes": 70129,
+      "mtime_utc": "2026-09-03T12:37:49+00:00"
+    },
+    {
+      "path": "outputs/fold05_lb90_s0_poolB_universe/eval_sealed_ft_fold05/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "fc1c800ddff714f39659ae01c8bcaa21f0b156a27602c29577f8513f7dc9956d",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T07:52:56+00:00"
+    },
+    {
+      "path": "outputs/fold06_lb90_s0_poolB_universe/eval_sealed_ft_fold06/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "461a72684dfefff02ca465dc4bea9e0461ea6d0ef79c3a46ea735a8314b1c4a2",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T09:43:20+00:00"
+    },
+    {
+      "path": "outputs/fold07_lb90_s0_poolB_universe/eval_sealed_ft_fold07/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "a1a1ab2cffdd1c80b66649a8053fc81fd0c461c9180915b435aaed8e99a44899",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T10:57:41+00:00"
+    },
+    {
+      "path": "outputs/fold08_lb90_s0_poolB_universe/eval_sealed_ft_fold08/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "531649a34fa93f3e91e918aec6014c52560a43427d23b628e95331b1c1cccdf3",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T12:43:34+00:00"
+    },
+    {
+      "path": "outputs/fold09_lb90_s0_poolB_universe/eval_sealed_ft_fold09/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "92fdbdba3733243b67f66a734dfb8b6ab95ab6432834dc800d2f62ebb5c8116f",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T14:20:22+00:00"
+    },
+    {
+      "path": "outputs/fold10_lb90_s0_poolB_universe/eval_sealed_ft_fold10/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "d6c1e6a5be16228fe542887fdf8603585712d9585e048849b5e3e91d227d6bb2",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T15:15:56+00:00"
+    },
+    {
+      "path": "outputs/fold11_lb90_s0_poolB_universe/eval_sealed_ft_fold11/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "2e53e06015990667f3575d3cf69f2b8c920e362d20450456ffb9a98269c119bd",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T16:11:45+00:00"
+    },
+    {
+      "path": "outputs/fold12_lb90_s0_poolB_universe/eval_sealed_ft_fold12/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "b0ecf270ebce4e062aa6ad22a67b6a2e8cf0766231df6af207107c2dd789a2b3",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T17:09:50+00:00"
+    },
+    {
+      "path": "outputs/fold13_lb90_s0_poolB_universe/eval_sealed_ft_fold13/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "6ec459ee135d4dbaf8d1b608468d041bfcda9900523256de988b04597d963b1d",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T18:57:37+00:00"
+    },
+    {
+      "path": "outputs/fold14_lb90_s0_poolB_universe/eval_sealed_ft_fold14/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "707bfd112c15e963f64ebd5941935166f062fa6592588365b6462141e773056d",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T20:52:54+00:00"
+    },
+    {
+      "path": "outputs/fold15_lb90_s0_poolB_universe/eval_sealed_ft_fold15/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "4f53d92dbc8b8d10e8c0933fad40377527cb3b54938a23b8f4fe2029df3da2f0",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-01T22:38:22+00:00"
+    },
+    {
+      "path": "outputs/fold16_lb90_s0_poolB_universe/eval_sealed_ft_fold16/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "199fef032cf1b3b45514178bc5b136e5270cb50c7e05d25f9084f8cf00ae68a5",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T00:35:53+00:00"
+    },
+    {
+      "path": "outputs/fold17_lb90_s0_poolB_universe/eval_sealed_ft_fold17/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "a17476cc0254f23268dc7eafbc684dc37e7ba5c8edce3229991884f3fc878c35",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T02:33:59+00:00"
+    },
+    {
+      "path": "outputs/fold18_lb90_s0_poolB_universe/eval_sealed_ft_fold18/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "6916b1abc257b99bc929788088342f70a01216f8dd60d68457636dbdb30607f2",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T04:32:43+00:00"
+    },
+    {
+      "path": "outputs/fold19_lb90_s0_poolB_universe/eval_sealed_ft_fold19/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "adcf8a173bfe9dedd1841b6066677535547c65b6ebc0760b5f5a0044a381e725",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T05:47:43+00:00"
+    },
+    {
+      "path": "outputs/fold20_lb90_s0_poolB_universe/eval_sealed_ft_fold20/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "43483a9cf6a205f59b4a4abc0473c7b9921677792683969753e87ab97684df8e",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T07:29:02+00:00"
+    },
+    {
+      "path": "outputs/fold21_lb90_s0_poolB_universe/eval_sealed_ft_fold21/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "380b698bdbc83e787bf1220fc2c61388679cb84004f4e005969695e4333c25f7",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T09:21:19+00:00"
+    },
+    {
+      "path": "outputs/fold22_lb90_s0_poolB_universe/eval_sealed_ft_fold22/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "d501621fdc21c8b0893282bf5e4c3d442f44a368558de5217986a0a69461541f",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T10:21:30+00:00"
+    },
+    {
+      "path": "outputs/fold23_lb90_s0_poolB_universe/eval_sealed_ft_fold23/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "50bffe017db6c82601479914d4fd1ae1d91e1af99bc74bd2675794097ec03cb6",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T12:11:08+00:00"
+    },
+    {
+      "path": "outputs/fold24_lb90_s0_poolB_universe/eval_sealed_ft_fold24/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "21f334b1c4faf0ba0adc3048a65e447bfa43955b3a99837a7e3205361a7fcb43",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T14:10:07+00:00"
+    },
+    {
+      "path": "outputs/fold25_lb90_s0_poolB_universe/eval_sealed_ft_fold25/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "cd753df6caa43bdb0e3912220ece42e603fde4fdeca1ed4efb29c0b41b417805",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T15:57:34+00:00"
+    },
+    {
+      "path": "outputs/fold26_lb90_s0_poolB_universe/eval_sealed_ft_fold26/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "471aeb7f19934a4138d3bfb9fc88fb23fb1fddc4d25b6312b3c2824f940f897f",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T16:57:00+00:00"
+    },
+    {
+      "path": "outputs/fold27_lb90_s0_poolB_universe/eval_sealed_ft_fold27/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "d5b851b7e815400de326c1056c4b91cf1695d587fa39f4a4a3a4785cd96445c7",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T18:45:56+00:00"
+    },
+    {
+      "path": "outputs/fold28_lb90_s0_poolB_universe/eval_sealed_ft_fold28/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "a36687be4b59ad6bf917e42e65769b14a8f80ec3ea899dedd6a05f3d4a911944",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T20:16:46+00:00"
+    },
+    {
+      "path": "outputs/fold29_lb90_s0_poolB_universe/eval_sealed_ft_fold29/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "b23097091bf3bb81c8619bd85d4e3b0b1fd26601d9cc0e5965febbbdbe569b46",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T21:13:44+00:00"
+    },
+    {
+      "path": "outputs/fold30_lb90_s0_poolB_universe/eval_sealed_ft_fold30/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "1f0e10ef75029eb1bca4ef261304f014a991b4d85bafc351cb88bed5156992bd",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-02T22:50:01+00:00"
+    },
+    {
+      "path": "outputs/fold31_lb90_s0_poolB_universe/eval_sealed_ft_fold31/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "1352650d0daaa0dfde846cc85b5bb2267ae35a6ea77bab4c9465909e47c02549",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T00:31:43+00:00"
+    },
+    {
+      "path": "outputs/fold32_lb90_s0_poolB_universe/eval_sealed_ft_fold32/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "b8a915284ce4cd1b23283616bae46e42694e00cca91542cfd610bbcdb9f32622",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T02:25:36+00:00"
+    },
+    {
+      "path": "outputs/fold33_lb90_s0_poolB_universe/eval_sealed_ft_fold33/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "38bef2b7de58c02ba0368cfe7ac48b2cea59e8db741cff966bfcd86c3ce49edd",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T04:12:28+00:00"
+    },
+    {
+      "path": "outputs/fold34_lb90_s0_poolB_universe/eval_sealed_ft_fold34/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "fc2dd36b83848c84bda1d1e4c9e2cbbfc9bdc585912cd6be4a8f600ac3aea8cf",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T05:56:33+00:00"
+    },
+    {
+      "path": "outputs/fold35_lb90_s0_poolB_universe/eval_sealed_ft_fold35/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "de0706bd31ab82a0369472a4ee2842e8b9dae46017235ce22a732449b07bc918",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T07:43:12+00:00"
+    },
+    {
+      "path": "outputs/fold36_lb90_s0_poolB_universe/eval_sealed_smoke_fold36/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "cc1dc97f1b4110c3613bb5c1e6aa6af6955c4d13532d60e714cd9af1ecab1fb1",
+      "bytes": 1557,
+      "mtime_utc": "2026-09-01T06:08:46+00:00"
+    },
+    {
+      "path": "outputs/fold44_lb90_s0_poolB_universe/eval_sealed_ft_fold44/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "0a3c9a849925fcb64d7d94597121aaaef94cf06fcf09560b16b7a7336b02c64c",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T09:16:06+00:00"
+    },
+    {
+      "path": "outputs/fold45_lb90_s0_poolB_universe/eval_sealed_ft_fold45/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "ef4f9416c5f5ce07beecd35016f1b6d15366ef546afbba685d78eb37278d0c78",
+      "bytes": 1582,
+      "mtime_utc": "2026-09-03T10:50:13+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold05/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "d935f0ed011a87cebbf24ba60a4c2be51282dc634c1934413384b8ccf503f73b",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T08:10:21+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold06/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "1eac010537dcf9cd7ee48c2ea08c6a840b198d9e1d3997ce7be4dc9cd4ab4d37",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T09:57:53+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold07/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "84198ab2046c3e129ea0118f9c73031f5ad1ef0f7bf0c0b52b2fb3a7b37c259d",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T11:15:12+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold08/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "bbf60566f501e84c4df147f9887e80ace131b9f8acc37361d88072e2811a8f64",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T13:01:18+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold09/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "495ac2d6d1aa98c1ad34c0d9641e1dd044739cbd77b6ef1d0c81c99b639f01a9",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T14:37:58+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold10/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "bee99c783d03a339c492d858dbabd8a9077013134e9f8e5d3175d1bcb4aa5703",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T15:33:55+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold11/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "0ab549706f1d73ee814d3729de26d5760611e0488778d04c4014246577b5662c",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T16:29:31+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold12/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "c360df51bda66918f98d4a182697c555bbc7d03f29e352b0dcb352df0dea293e",
+      "bytes": 1584,
+      "mtime_utc": "2026-09-01T17:27:08+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold13/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "0b1f49ba8725d130a50979a5608ade68ba3dbd177ab1b16d718dbfee30b94bce",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T19:13:00+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold14/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "9999ddc3e798a207b1ea8a895e8a48599a0127711b3824c08088aec0c7cffa4a",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T21:09:22+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold15/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "48f3e655c7260bd4ec1dbcaa29c35915c8916ad88b84003fca5651ec969e9d9a",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-01T22:55:33+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold16/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "54aa99ff4d69a885ac8d67b9d5edd2571e3ef046ef58d197bce6b7fc6631871f",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T00:52:43+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold17/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "27bb92eff1e664608ba196ba91508460d0066ba0cf6321d6fa7259f0334ca0de",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T02:51:52+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold18/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "80f969e06f12ad1ef33abaf1391d3583ed2cd6713ca99f10ece18353fb7c3de5",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T04:50:12+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold19/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "58956355bcb1b917ccdbd46d700c94463168ca43a8b3901dae4617e26b63f50c",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T06:04:56+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold20/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "c1eed2575e903a1338a1588010f2efa1a2d15c27d00c12eaf31b2437c1ed3e44",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T07:45:24+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold21/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "80d30d727abbed7fdc8329c6e7177e3afe5abd7ecc9292df33481be751ded47e",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T09:38:44+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold22/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "a9ff5859568d74d92df81439fc26ae5babeb69c1e3cd222a078ee7ef9b942c6c",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T10:39:20+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold23/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "91df96b8f88bd1418ee3fe422080418f95a64b2d8ceaff188dc67ce7dcf89fe0",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T12:28:40+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold24/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "6e79ed104d0c280ea3399842e798c93f8b46c1744d0caed334fcfd4d4c7d596a",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T14:28:15+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold25/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "ee7c6b6dc737c5ffa97cf0df18f026b075db39a3fcfd7b15867fd2da1cd19e79",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T16:15:15+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold26/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "31538fa5708bfc5770d14c2f8ad20d0058dbd4f729998935f294c23fec8c4b86",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T17:15:03+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold27/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "75f1696c545661daae548219f8d6f25d0fed11ca820657d7abc7691d79ea1844",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T19:03:36+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold28/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "56ef93d4a7654e5683b637f9690863e2666e4982b0a35d29a353418e94de2e5f",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T20:34:40+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold29/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "2e1adb7bcf7c529ddae21647d13bb875531b9356f82964ba882e975802fe5384",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T21:31:30+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold30/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "66fac6bacde1a7c3a0058fe6282560d536390fac12b1dfde1c26671adddee55b",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-02T23:08:04+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold31/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "9509045c440da8194414172473c9c81d812f408e1450cc9a88305fc9e9c652f8",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T00:49:28+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold32/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "db0498b155517239a5e7c11c5ddc295143724e19e929547cb39eb7d7a25cabc1",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T02:43:37+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold33/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "546b93a71f4129c423ed3aef16d34366dfe4d99289bf07949a6634fecf2d7edf",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T04:30:10+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold34/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "b0039422f9843351f38c639aa0ce4c05a1baa2a1c735a91ac3cf98f099fb7840",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T06:14:42+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold35/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "005dea46200c1d54199cc073999b127ce308dd3c4f569fa924a4517438bb98cd",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T08:00:55+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold44/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "de411345f7281be0e1aa8ae42e3afa8ef0d22b5eaff6a101c960b1d9187c84cf",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T09:34:01+00:00"
+    },
+    {
+      "path": "outputs/zeroshot_base/eval_sealed_zs_fold45/SEALED_MANIFEST.json",
+      "status": "ok",
+      "sha256": "601292ddc008e0d60e1a67002c7e1195a7de5e3232abf9ac0cbdc42ac4455a2b",
+      "bytes": 1566,
+      "mtime_utc": "2026-09-03T11:07:36+00:00"
+    }
+  ],
+  "counts": {
+    "total": 78,
+    "present": 78,
+    "missing": 0
+  },
+  "self_sha256_recipe": "去掉顶层 self_sha256 键后 json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(\",\", \":\"))，UTF-8 编码，取 sha256 十六进制。",
+  "self_sha256": "f156b3861abb001ae36d7ba7026c5ade531e152131fa8ef6d8a9e15120190bb2"
+}
