@@ -22,18 +22,30 @@ labels.parquet（§4 标签 + 状态）、metrics.json、report.md。
 内存注意：面板按需切片（评估窗前 lookback+缓冲 起）。退市原因细分
 （delisted vs halted）在切片下可能把窗前已退市误报为 halted——只影响
 unfillable 原因统计，不影响标签值。
+
+显存注意（2026-09-04 新增 ``--gpu-mem-fraction``）：Windows WDDM 下
+``cudaMalloc`` 不会因显存耗尽而失败，而是把分配落到系统内存；PyTorch 的
+缓存分配器因此永远收不到「该回收缓存」的信号，长跑后整卡被撑满并换页，
+实测速度掉 3–4 倍。``--gpu-mem-fraction`` 给本进程的分配器设一个上限，
+让它触顶时释放缓存而不是向系统内存溢出。**纯工程参数**：不进
+``scoring_config``、不改数值、不改 RNG 调用序列（§八 的口径核对不受影响）。
+运行侧事实（封顶值 / 实际 device / 打分墙钟 / 显存峰值）另写 ``metrics.json``
+的新顶层键 ``runtime``（封存模式写进 ``SEALED_MANIFEST.json`` 的同名键）。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -48,13 +60,68 @@ from crsp_pipeline.signal_eval import (  # noqa: E402
     winsorized_rank_ic,
 )
 from kronos_ft.infer import run_scoring  # noqa: E402
-from kronos_ft.models import load_pretrained  # noqa: E402
+from kronos_ft.models import load_pretrained, pick_device  # noqa: E402
 from kronos_ft.train import append_ledger  # noqa: E402
 from kronos_ft.windows import build_scoring_index, filter_index_by_universe  # noqa: E402
+
+GIB = float(1 << 30)
 
 
 def log(msg: str) -> None:
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+
+
+def _device_type(device) -> str:
+    """torch.device / 字符串 / None → device 类型串（'cuda' / 'cpu' / ...）。"""
+    if device is None:
+        return ""
+    t = getattr(device, "type", None)
+    if t is not None:
+        return str(t)
+    return str(device).split(":", 1)[0]
+
+
+def gpu_mem_fraction_arg(value: str) -> float:
+    """argparse 类型：显存封顶比例必须落在 (0, 1]。"""
+    x = float(value)
+    if not (0.0 < x <= 1.0):
+        raise argparse.ArgumentTypeError(
+            f"--gpu-mem-fraction 必须落在 (0, 1]，收到 {value}")
+    return x
+
+
+def apply_gpu_mem_fraction(fraction: float | None, device) -> bool:
+    """给本进程的 CUDA 缓存分配器设显存上限；返回是否真的设了。
+
+    只在 fraction 非空且 device 为 cuda 时调用
+    ``torch.cuda.set_per_process_memory_fraction``。CPU / MPS 路径一个 CUDA
+    调用都不发。纯工程开关：不改数值、不改 RNG 调用序列、不进 scoring_config。
+    """
+    if fraction is None:
+        return False
+    if _device_type(device) != "cuda":
+        return False
+    torch.cuda.set_per_process_memory_fraction(float(fraction))
+    return True
+
+
+def build_runtime_info(fraction: float | None, device, scoring_seconds: float) -> dict:
+    """metrics.json / 封存清单的新顶层键 ``runtime``（运行侧事实，非口径）。
+
+    显存峰值只在 device 为 cuda 且 CUDA 可用时读取；否则为 None。
+    """
+    allocated = reserved = None
+    if _device_type(device) == "cuda" and torch.cuda.is_available():
+        allocated = float(torch.cuda.max_memory_allocated()) / GIB
+        reserved = float(torch.cuda.max_memory_reserved()) / GIB
+    return {
+        "gpu_mem_fraction": (None if fraction is None else float(fraction)),
+        "device": str(device),
+        "scoring_seconds": float(scoring_seconds),
+        "max_memory_allocated_gib": allocated,
+        "max_memory_reserved_gib": reserved,
+        "pytorch_cuda_alloc_conf": os.environ.get("PYTORCH_CUDA_ALLOC_CONF"),
+    }
 
 
 def stratified_ic(df: pd.DataFrame, strat_col: str, n_groups: int = 5,
@@ -73,7 +140,7 @@ def stratified_ic(df: pd.DataFrame, strat_col: str, n_groups: int = 5,
     return out
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="单折验证窗评估（打分 + RankIC）")
     ap.add_argument("--model-dir", required=True,
                     help="含 tokenizer_final / predictor_final 的训练输出目录")
@@ -89,11 +156,22 @@ def main() -> None:
                     help="GPU 侧混合精度（默认关=fp32）。开启会改变数值 → "
                          "与 fp32 口径的读数不可直接比较，须整批同口径")
     ap.add_argument("--device", default=None, help="cpu / cuda；默认自动")
+    ap.add_argument("--gpu-mem-fraction", type=gpu_mem_fraction_arg, default=None,
+                    metavar="F",
+                    help="仅工程参数（不进 scoring_config、不改任何数值）：给本进程的 "
+                         "CUDA 缓存分配器设显存上限，取值 (0,1]。用途是 Windows WDDM 下 "
+                         "cudaMalloc 不会失败而是溢出到系统内存，分配器收不到回收信号、"
+                         "长跑后撑满整卡并换页（实测掉速 3–4 倍）；设了封顶后分配器触顶即"
+                         "释放缓存。默认不设（行为与既往逐位一致）")
     ap.add_argument("--limit-obs", type=int, default=0,
                     help="只打前 N 个观测（冒烟验证代码路径用；正式评估勿用）")
     ap.add_argument("--sealed", action="store_true",
                     help="封存模式（2026-09-02 授权）：写完 scores.parquet 立即返回；绝不进入 label/metrics/report/daily_ic 路径；登记簿只记计算事实、不记任何分数统计")
-    args = ap.parse_args()
+    return ap
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     model_dir = Path(args.model_dir)
     P = Path(args.processed)
@@ -128,13 +206,25 @@ def main() -> None:
     log("加载微调模型...")
     tokenizer, model = load_pretrained(str(model_dir / "tokenizer_final"),
                                        str(model_dir / "predictor_final"))
+    # device 判定沿用 run_scoring 内部同一函数，避免两处逻辑漂移
+    dev = pick_device(args.device)
+    if apply_gpu_mem_fraction(args.gpu_mem_fraction, dev):
+        log(f"显存封顶 set_per_process_memory_fraction({args.gpu_mem_fraction}) "
+            f"@ {dev}（工程参数，不进 scoring_config、不改数值）")
+    if _device_type(dev) == "cuda" and torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+
     log("推理打分（多路径均值，官方采样参数）...")
     need_pn = set(sidx["PERMNO"].unique())
     adj_scoring = adj[adj["PERMNO"].isin(need_pn)]
+    _t0 = time.perf_counter()
     scores = run_scoring(tokenizer, model, adj_scoring, sidx, cal,
                          args.lookback, predict=args.predict,
                          batch_size=args.batch_size, device=args.device,
                          amp=args.amp, sample_count=args.sample_count)
+    runtime = build_runtime_info(args.gpu_mem_fraction, dev,
+                                 time.perf_counter() - _t0)
+    log("runtime: " + json.dumps(runtime, ensure_ascii=False))
     scores.to_parquet(out / "scores.parquet", index=False)
 
     if args.sealed:
@@ -158,6 +248,9 @@ def main() -> None:
                  "kronos_ft/windows.py", "crsp_pipeline/splits.py")
                 if (src / rel).exists()
             } | {"scripts/evaluate_fold.py": sha256_file(Path(__file__))},
+            # 运行侧事实（工程口径，不属于 config；加键不影响 write_seal 与
+            # tests/test_sealed_mode.py 的清单断言——两者只查必需键是否存在）
+            "runtime": runtime,
             "scores_sha256": sha256_file(out / "scores.parquet"),
             "scores_rows": int(len(scores)),
             "limit_obs": args.limit_obs,
@@ -224,6 +317,9 @@ def main() -> None:
         "scoring_config": {"amp": args.amp, "batch_size": args.batch_size,
                            "sample_count": args.sample_count,
                            "lookback": args.lookback, "predict": args.predict},
+        # runtime 是运行侧事实（显存封顶 / 墙钟 / 峰值），**不是口径**：
+        # §八 的口径核对只看 scoring_config，该字典的键值一个未动。
+        "runtime": runtime,
         "n_obs": int(len(df)),
         "n_days": int(ic.notna().sum()),
         "label_ok_share": ok_share,
