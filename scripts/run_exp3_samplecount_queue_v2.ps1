@@ -16,8 +16,13 @@
 #
 # 输出仍用 Start-Process 的 stdout/stderr 分离重定向，不使用 PowerShell *>。
 param(
-    [int]$LimitObs = 0   # 可选：传给 --limit-obs（冒烟用；两个冒烟项另有写死的 6000）
+    [int]$LimitObs = 0,          # 可选：传给 --limit-obs（冒烟用；两个冒烟项另有写死的 6000）
+    [double]$MemFraction = 0.70, # --gpu-mem-fraction 的值（工程参数，不进 scoring_config）
+    [double]$Sc40GateGib = 8.5   # sc40 冒烟 allocated 超过它就跳过 sc40 三项
 )
+# 2026-09-04 第二轮（用户裁定选项 1）：sc40/b128 活跃峰值约 9.7 GiB，0.70 封顶下 OOM；
+# 改以 -MemFraction 0.85 -Sc40GateGib 13.0 重跑本脚本：已完成项全部由 Test-Complete 跳过，
+# 只重做 sc40 冒烟与 sc40 三折。门槛 13.0 ≈「冒烟没 OOM 就放行」（上限 0.85×16=13.6 GiB）。
 
 $ErrorActionPreference = "Stop"
 $REPO = "F:\quant\us-quant-pipeline"
@@ -30,13 +35,15 @@ $QUEUE_STARTED = Get-Date
 # 方案 A 的配套：分配器内部策略，只在设了 memory fraction 时才起作用
 # （触顶前先跑一轮缓存回收）。不影响数值，子进程继承本变量。
 $env:PYTORCH_CUDA_ALLOC_CONF = "garbage_collection_threshold:0.8"
-$MEM_FRACTION = "0.70"
+if ($MemFraction -le 0 -or $MemFraction -gt 1) { throw "-MemFraction 必须落在 (0,1]，收到 $MemFraction" }
+$MEM_FRACTION = $MemFraction.ToString("0.00", [System.Globalization.CultureInfo]::InvariantCulture)
 
 $SMOKE_MODEL = "$REPO\outputs\fold36_lb90_s0_poolB_universe"
 $SMOKE_START = "2020-07-01"
 $SMOKE_END = "2020-12-31"
 $SMOKE_LIMIT = 6000
-$SC40_ALLOC_GATE_GIB = 8.5
+$SC40_ALLOC_GATE_GIB = $Sc40GateGib
+Write-Host ("队列 v2 参数：gpu-mem-fraction={0}  sc40 门槛={1} GiB  PYTORCH_CUDA_ALLOC_CONF={2}" -f $MEM_FRACTION, $SC40_ALLOC_GATE_GIB, $env:PYTORCH_CUDA_ALLOC_CONF) -ForegroundColor DarkCyan
 
 Set-Location $REPO
 New-Item -ItemType Directory -Force -Path $LOGDIR | Out-Null
