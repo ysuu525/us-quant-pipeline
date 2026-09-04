@@ -14,8 +14,10 @@
 ------------------------------------------------------------------------------
   experiments/ledger.md
   experiments/confirmation_protocol_v3.md
+  experiments/confirmation_protocol_v4.md            （解封时实际生效的冻结协议）
   experiments/confirmation_protocol_v4_revisions.md
   experiments/signal2_prereg_v2.md          （不存在则记 status=missing，不报错）
+  experiments/ict_pattern_probe_prereg_v1.md         （H6 的标记定义与 SESOI）
   experiments/cost_pilot_protocol_v1_draft.md
   docs/研究计划书_v0.2_2026-09-04.md        （不存在则回退到 v0.1 = 2026-09-03 版）
   CLAUDE.md
@@ -93,8 +95,9 @@ manifest 内容
 
     1. osf.io 注册并新建 project（可先设 Private）。
     2. Files 里上传：本 manifest JSON + 被哈希的文本原件
-       （ledger.md、协议 v3、协议 v4 修订、成本小试协议草稿、研究计划书、
-         CLAUDE.md、HANDOFF.md）。封存目录的清单文件不必上传原件——它们的
+       （ledger.md、协议 v3、**协议 v4 冻结版**、协议 v4 修订、信号#2 预注册 v2、
+         ICT 探针预注册 v1、成本小试协议草稿、研究计划书、CLAUDE.md、HANDOFF.md）。
+       封存目录的清单文件不必上传原件——它们的
          sha256 已在 manifest 里，上传原件反而扩大误触面。
     3. 左栏 Registrations → New registration → 模板选 **"Open-Ended Registration"**。
     4. 填标题/摘要（一句话：本次注册的是折 05–35 解封前的协议与登记簿状态），提交。
@@ -135,8 +138,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FILES: tuple[str, ...] = (
     "experiments/ledger.md",
     "experiments/confirmation_protocol_v3.md",
+    # v4 冻结版是解封时实际生效的协议；第二章时间戳就是为它盖的
+    # （协议 v4 §7 第 7 条：只盖第一章会把最该锚定的文件漏在时间戳之外）。
+    "experiments/confirmation_protocol_v4.md",
     "experiments/confirmation_protocol_v4_revisions.md",
     "experiments/signal2_prereg_v2.md",          # 允许缺失
+    # H6（ICT P1）的标记定义、约定与 SESOI 全在这份预注册里，协议 v4 §2.8 逐条引用它。
+    "experiments/ict_pattern_probe_prereg_v1.md",
     "experiments/cost_pilot_protocol_v1_draft.md",
     "CLAUDE.md",
     "HANDOFF.md",

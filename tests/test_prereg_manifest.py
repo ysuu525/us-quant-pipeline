@@ -44,7 +44,9 @@ def make_repo(tmp_path: Path, *, with_v02: bool = False, with_prereg_v2: bool = 
     for rel, text in [
         ("experiments/ledger.md", "- 2026-09-04 | DECISION | 假登记簿\n"),
         ("experiments/confirmation_protocol_v3.md", "协议 v3\n"),
+        ("experiments/confirmation_protocol_v4.md", "协议 v4 冻结版\n"),
         ("experiments/confirmation_protocol_v4_revisions.md", "协议 v4 修订\n"),
+        ("experiments/ict_pattern_probe_prereg_v1.md", "ICT 探针预注册 v1\n"),
         ("experiments/cost_pilot_protocol_v1_draft.md", "成本小试 v1 草稿\n"),
         ("CLAUDE.md", "强制规则\n"),
         ("HANDOFF.md", "交接\n"),
@@ -88,8 +90,10 @@ def test_collect_paths_covers_defaults_and_sealed_manifests(tmp_path):
     repo = make_repo(tmp_path)
     paths = pm.collect_paths(repo)
     for rel in ("experiments/ledger.md", "experiments/confirmation_protocol_v3.md",
+                "experiments/confirmation_protocol_v4.md",
                 "experiments/confirmation_protocol_v4_revisions.md",
                 "experiments/signal2_prereg_v2.md",
+                "experiments/ict_pattern_probe_prereg_v1.md",
                 "experiments/cost_pilot_protocol_v1_draft.md",
                 "CLAUDE.md", "HANDOFF.md", "docs/研究计划书_2026-09-03.md"):
         assert rel in paths, rel
