@@ -9,7 +9,7 @@ git 里只有代码、测试、配置和快照 manifest 的引用（§11 可复�
 ## 仓库结构
 
 ```
-docs/                  规范 v1.2 / v1.3、持仓管理规则（只读参考）
+docs/                  规范 v1.3、调研与研究计划书（只读参考）；archive/ 为已过期文档
 downloader/            CRSP CIZ 下载器（独立可用，见其 README）
 src/crsp_pipeline/     管线代码
   calendar.py            交易日历（§7/§9 日期算术基础）
