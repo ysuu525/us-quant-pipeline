@@ -10,6 +10,17 @@ $EXP3LOCK = "$REPO\outputs\exp3_samplecount.queue.lock"
 $QUEUE_STARTED = Get-Date
 $lockStream = $null
 
+# 2026-09-05（用户裁定，主会话改）：显存封顶，来源实验 3 的实测（ledger 09-04/05 tooling 行）。
+# 不封顶时 b128×sc20=2560 条序列会在 WDDM 上换页、每折 3.5 h；b128×sc40 直接撞显存。
+# 封顶是纯工程参数：不进 scoring_config、不改数值、不改 RNG 调用序列。
+# sc5/10/20 用 0.70（实测 sc20 峰值 allocated 5.07 GiB）；sc40 用 0.85（实测 9.98 GiB，0.70 会 OOM）。
+$env:PYTORCH_CUDA_ALLOC_CONF = "garbage_collection_threshold:0.8"
+function Get-MemFraction {
+    param([int]$SampleCount)
+    if ($SampleCount -ge 40) { return "0.85" }
+    return "0.70"
+}
+
 Set-Location $REPO
 New-Item -ItemType Directory -Force -Path $LOGDIR | Out-Null
 
@@ -109,14 +120,16 @@ function Invoke-Exp9 {
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         Wait-KnownGpuQueue
         Wait-MemoryGate
-        $stdout = Join-Path $LOGDIR "$Label.log"
-        $stderr = Join-Path $LOGDIR "$Label.err.log"
+        # 每次尝试单独命名，重试不覆盖上一次的 err.log（实验 3 fold40 首次夭折原因因覆盖丢失）
+        $stdout = Join-Path $LOGDIR "$Label.a$attempt.log"
+        $stderr = Join-Path $LOGDIR "$Label.a$attempt.err.log"
         $arguments = @(
             "scripts\evaluate_fold.py", "--model-dir", $ModelDir,
             "--processed", $P, "--val-start", $ValStart, "--val-end", $ValEnd,
             "--lookback", "90", "--tag", $Tag, "--predict", "6",
             "--batch-size", "128", "--sample-count", [string]$SampleCount,
-            "--amp", "bf16", "--device", "cuda"
+            "--amp", "bf16", "--device", "cuda",
+            "--gpu-mem-fraction", (Get-MemFraction $SampleCount)
         )
         $started = Get-Date
         Write-Host "${Label}：第 $attempt 次启动 $($started.ToString('o'))" -ForegroundColor Cyan
