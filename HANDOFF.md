@@ -98,6 +98,10 @@ v4 §8.2 唯一未闭合的披露项 **#3**（H3 候选 SESOI 0.0072 / 0.0108 �
 `HANDOFF.md:<行号>` 引用**全仓 84 处、6 个文件、49 个行号 > 124**，全部指向已归档正文，须逐条重定位
 （旧 140 → 归档 115 有 25 行偏移，**不可批量替换**，`ledger.md:505`①）。
 
+**Compustat 到位 + exp13 已完成（09-05，不在解封链上）**：合作者经 WRDS 提供的年度 / 季度宽表在 `F:\quant\external\compustat\received_20260905\`，只读验收通过、两个 ZIP 哈希已独立复核（`ledger.md` 09-05 `data-receipt`）。**无 CCM 链接表**，exp13 暂用 header CUSIP 接 CRSP（`ledger.md` 09-05 `DECISION` + `[exp13]` 六条 + `review`）。
+**开发折读数（36–42，方向性证据，估计交付、不判定）**：v4 §2.4 两个缺口补做后 S-TH-ind 的 alpha **未被解释掉**（+6.76 → +6.93%/年，6/7 折，NT=6 口径），`ea_prox` 载荷 −0.106（CI 不覆盖 0）；财报日二阶矩 **3.38×**（7/7 折），含财报日的 6 日窗占 11.9% 却承担 20.6% 方差，均值差 CI [−23, +11] bp ⇒ **「财报窗均值是否更差」在本样本量下不可回答**，「不规避财报」维持 09-03 决定。
+**v4 §2.4 的缺口措辞原样保留、不改冻结协议。** 待办：向合作者要 `crsp.ccmxpf_lnkhist` 与原 WRDS 查询回执，到手后 exp13 §3.3 整节替换重跑。任务书 `docs/任务书_exp13_Compustat_开发折诊断_2026-09-05.md`（sha256 `f8d1ec2b…`，已冻结）；产物 `outputs/exp13_compustat_dev_diag/`（gitignored）；派生表 `F:\quant\external\compustat\derived\`（不进 git）。
+
 **解封前置清单（v4 §7 十一条，逐条状态）**：
 
 | # | 内容 | 状态 |
