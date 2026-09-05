@@ -1,0 +1,16 @@
+M CLAUDE.md
+ M experiments/ledger_draft_exp9_review_2026-09-05.md
+ M third_party/kronos
+?? "docs/\344\273\273\345\212\241\344\271\246_exp16_topk\346\216\222\345\272\217\345\244\264_2026-09-06.md"
+?? "docs/\347\240\224\347\251\266\350\257\212\346\226\255\344\270\216\346\224\266\345\217\243\345\273\272\350\256\256_2026-09-05.md"
+?? "docs/\350\260\203\347\240\224_RL\344\270\216\345\244\232\346\231\272\350\203\275\344\275\223\345\234\250\351\207\217\345\214\226\344\270\255\347\232\204\350\257\201\346\215\256\347\212\266\346\200\201_2026-09-05.md"
+?? experiments/ledger_drafts_fable_exp16_2026-09-06.md
+?? experiments/ots_backup_20260905/preregistration_manifest_20260905T151207Z.json.ots.pending.bak
+?? output/
+?? scripts/exp16_common.py
+?? scripts/exp16_readout.py
+?? scripts/exp16_run_topk_folds.py
+?? scripts/exp16a_ic_head_nt5.py
+?? tests/test_exp16_common.py
+?? tests/test_exp16_driver.py
+?? tests/test_exp16_readout.py
