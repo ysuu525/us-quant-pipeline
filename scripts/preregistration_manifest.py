@@ -16,6 +16,8 @@
   experiments/confirmation_protocol_v3.md
   experiments/confirmation_protocol_v4.md            （解封时实际生效的冻结协议）
   experiments/confirmation_protocol_v4_revisions.md
+  experiments/confirmation_protocol_v4.1_addendum_2026-09-05.md
+                                            （v4 冻结之后追加的附录，同样是生效口径）
   experiments/signal2_prereg_v2.md          （不存在则记 status=missing，不报错）
   experiments/ict_pattern_probe_prereg_v1.md         （H6 的标记定义与 SESOI）
   experiments/cost_pilot_protocol_v1_draft.md
@@ -23,11 +25,21 @@
   CLAUDE.md
   HANDOFF.md
   third_party/kronos_local.patch            （子模块工作区补丁，见 DEFAULT_FILES 处注释）
-  所有封存目录下的 SEALED_MANIFEST.json（glob，见下）
+  所有封存目录下的 SEALED_MANIFEST.json（三组 glob，见下）
+
+封存清单覆盖三组（都只钉清单文件本身）：
+  (1) Kronos 生成式：outputs/<臂>/<封存目录>/SEALED_MANIFEST.json         —— 预期 67 份
+  (2) 树基线打分：   outputs/gbdt_strong_jkp_v2/xgboost/<封存>/foldNN/…   —— 预期 31 份
+                     （折 05–35，目录深度比 (1) 深两层）
+  (3) 树基线特征缓存：outputs/gbdt_strong_jkp_v2/<缓存封存目录>/…          —— 预期 1 份
+      该缓存自带哨兵与清单，钉住的是**带训练目标 y 的缓存**与 JKP 快照口径
+      （config_sha256 / jkp_snapshot_sha256 / 覆盖年份），同样只读清单不碰 parquet。
+  合计预期 99 份。
 
 **只读 SEALED_MANIFEST.json 这一个文件，而且只按字节算哈希、不解析内容。**
 它是封存目录的清单/哨兵文件，含 snapshot_id / code_sha256 / scores_sha256 /
 val_window / config，**不含任何分数、标签或绩效指标**；同目录的 scores.parquet
+（树基线缓存目录下的 stock_features_*.parquet / jkp_state.parquet 同理）
 一个字节都不碰。审稿要的正是「被封存的是哪一批分数」可被外部验证，而清单文件
 恰好是唯一能提供这一点又不泄漏结果的载体。
 （因此这里**不**调用 crsp_pipeline.sealed.assert_readable —— 那个守卫会拒绝封存
@@ -41,7 +53,14 @@ tests/test_sealed_mode.py::test_no_ordinary_script_references_sealed_outputs
 **不得出现**封存目录标识字符串。本脚本必须 glob 封存目录才能找到清单文件，
 于是把目录名前缀写成运行时拼接 `"eval_" + "sealed_*"`（见 SEALED_DIR_GLOB），
 源码里因此不存在那个连写的字面量。**这是刻意为通过纪律扫描而做的拼接，不是笔误**，
-改动本文件时请保持这一写法，并在改完后跑：
+改动本文件时请保持这一写法——树基线那两组 glob（TREE_*）出于同样理由同样拼接。
+
+**为什么不用 rglob(SEALED_MANIFEST_NAME)**：outputs/ 下散落着 pytest 临时目录
+（outputs/pytest_tmp_*/…/foldXX/），里面有测试造的同名假清单。rglob 会把它们
+一并钉进预注册清单，使 manifest 的内容随「上次跑过哪些测试」而变、不可复现。
+因此这里用三组**显式**glob（SEALED_MANIFEST_GLOBS），只覆盖真实封存目录。
+
+改完后跑：
 
     .venv\\Scripts\\python.exe -m pytest tests\\test_sealed_mode.py \\
         tests\\test_prereg_manifest.py -q -p no:cacheprovider
@@ -95,10 +114,12 @@ manifest 内容
 
     1. osf.io 注册并新建 project（可先设 Private）。
     2. Files 里上传：本 manifest JSON + 被哈希的文本原件
-       （ledger.md、协议 v3、**协议 v4 冻结版**、协议 v4 修订、信号#2 预注册 v2、
-         ICT 探针预注册 v1、成本小试协议草稿、研究计划书、CLAUDE.md、HANDOFF.md）。
-       封存目录的清单文件不必上传原件——它们的
-         sha256 已在 manifest 里，上传原件反而扩大误触面。
+       （ledger.md、协议 v3、**协议 v4 冻结版**、协议 v4 修订、
+         **协议 v4.1 附录 2026-09-05**、信号#2 预注册 v2、ICT 探针预注册 v1、
+         成本小试协议草稿、研究计划书、CLAUDE.md、HANDOFF.md、
+         third_party/kronos_local.patch）。
+       封存目录的清单文件（Kronos 67 + 树基线 31 + 树基线特征缓存 1）不必上传原件
+         ——它们的 sha256 已在 manifest 里，上传原件反而扩大误触面。
     3. 左栏 Registrations → New registration → 模板选 **"Open-Ended Registration"**。
     4. 填标题/摘要（一句话：本次注册的是折 05–35 解封前的协议与登记簿状态），提交。
        提交后内容与时间戳都不可改，**registration 的时间戳就是外部证据**。
@@ -142,6 +163,9 @@ DEFAULT_FILES: tuple[str, ...] = (
     # （协议 v4 §7 第 7 条：只盖第一章会把最该锚定的文件漏在时间戳之外）。
     "experiments/confirmation_protocol_v4.md",
     "experiments/confirmation_protocol_v4_revisions.md",
+    # v4 冻结**之后**追加的附录，与 v4 正文一起构成解封时生效的口径；
+    # 不钉住它，「解封前协议长什么样」就少了一块。
+    "experiments/confirmation_protocol_v4.1_addendum_2026-09-05.md",
     "experiments/signal2_prereg_v2.md",          # 允许缺失
     # H6（ICT P1）的标记定义、约定与 SESOI 全在这份预注册里，协议 v4 §2.8 逐条引用它。
     "experiments/ict_pattern_probe_prereg_v1.md",
@@ -162,9 +186,29 @@ PROPOSAL_CANDIDATES: tuple[str, ...] = (
 
 # 刻意的运行时拼接：源码里不出现连写的封存目录标识，
 # 以通过 tests/test_sealed_mode.py 的纪律扫描（理由见模块 docstring）。
-SEALED_DIR_GLOB = "outputs/*/" + "eval_" + "sealed_*"
 SEALED_MANIFEST_NAME = "SEALED_MANIFEST.json"
+
+# (1) Kronos 生成式：outputs/<臂>/<封存目录>/  —— 预期 67 份
+SEALED_DIR_GLOB = "outputs/*/" + "eval_" + "sealed_*"
 SEALED_MANIFEST_GLOB = SEALED_DIR_GLOB + "/" + SEALED_MANIFEST_NAME
+
+# (2)(3) 树基线：根目录固定，(2) 比 Kronos 深两层（<模型>/<封存>/foldNN）。
+# 只钉 xgboost 主口径——授权里明确「只跑 XGBoost 主口径」；写成 */ 通配会在
+# 未来把别的模型目录或 pytest 临时目录一起卷进来，使清单不可复现。
+TREE_SEALED_ROOT = "outputs/gbdt_strong_jkp_v2"
+TREE_SEALED_DIR_GLOB = TREE_SEALED_ROOT + "/xgboost/" + "sealed" + "/fold*"
+TREE_SEALED_MANIFEST_GLOB = TREE_SEALED_DIR_GLOB + "/" + SEALED_MANIFEST_NAME
+# (3) 特征缓存：该目录自带哨兵与清单，钉住的是**带训练目标 y 的缓存**
+#     与 JKP 快照口径（config_sha256 / jkp_snapshot_sha256 / 覆盖年份）。
+TREE_CACHE_DIR_GLOB = TREE_SEALED_ROOT + "/cache_" + "sealed"
+TREE_CACHE_MANIFEST_GLOB = TREE_CACHE_DIR_GLOB + "/" + SEALED_MANIFEST_NAME
+
+# 三组显式 glob；不用 rglob，理由见模块 docstring（pytest 临时目录里有同名假清单）。
+SEALED_MANIFEST_GLOBS: tuple[str, ...] = (
+    SEALED_MANIFEST_GLOB,
+    TREE_SEALED_MANIFEST_GLOB,
+    TREE_CACHE_MANIFEST_GLOB,
+)
 
 SCHEMA = "preregistration_manifest/v1"
 SELF_HASH_KEY = "self_sha256"
@@ -201,10 +245,18 @@ def resolve_proposal(repo: Path, candidates: tuple[str, ...] = PROPOSAL_CANDIDAT
     return candidates[0]
 
 
-def sealed_manifest_paths(repo: Path) -> list[str]:
-    """所有封存目录下的清单文件（相对路径，排序去重）。只 glob 清单文件本身。"""
-    return sorted(p.relative_to(repo).as_posix()
-                  for p in repo.glob(SEALED_MANIFEST_GLOB) if p.is_file())
+def sealed_manifest_paths(repo: Path,
+                          globs: tuple[str, ...] = SEALED_MANIFEST_GLOBS) -> list[str]:
+    """所有封存目录下的清单文件（相对路径，排序去重）。只 glob 清单文件本身。
+
+    覆盖 Kronos 生成式、树基线逐折打分、树基线特征缓存三组；同一路径被多组匹配到
+    只留一份。**不** rglob——outputs/ 下有 pytest 临时目录造的同名假清单。
+    """
+    out: set[str] = set()
+    for pattern in globs:
+        out.update(p.relative_to(repo).as_posix()
+                   for p in repo.glob(pattern) if p.is_file())
+    return sorted(out)
 
 
 def collect_paths(repo: Path) -> list[str]:
