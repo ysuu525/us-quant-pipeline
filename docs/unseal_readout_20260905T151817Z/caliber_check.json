@@ -1,0 +1,870 @@
+[
+  {
+    "fold": "fold05",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold05_lb90_s0_poolB_universe\\eval_sealed_ft_fold05",
+    "val_window": [
+      "2005-01-03",
+      "2005-07-01"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "8ff0e719b65750b78271bda6d12fdb9119d2292125ea7a4d2892baa753a22d3f",
+    "scores_sha256_checked": true,
+    "scores_rows": 185441,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold06",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold06_lb90_s0_poolB_universe\\eval_sealed_ft_fold06",
+    "val_window": [
+      "2005-07-05",
+      "2005-12-30"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "180afc72b23e8166fe28aa45cb34b8b115c65ec288df5ab8e052ae730b806a9b",
+    "scores_sha256_checked": true,
+    "scores_rows": 154599,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold07",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold07_lb90_s0_poolB_universe\\eval_sealed_ft_fold07",
+    "val_window": [
+      "2006-01-03",
+      "2006-06-30"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "e8ac899db773977b3cd132f493eef57d74bcf280f5b1325abfd04bfcbf770e73",
+    "scores_sha256_checked": true,
+    "scores_rows": 187112,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold08",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold08_lb90_s0_poolB_universe\\eval_sealed_ft_fold08",
+    "val_window": [
+      "2006-07-03",
+      "2006-12-29"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "36e1e74f5b1121119de611d78046ccd351fb449dcc0f5423c4e84b8a8944ec6f",
+    "scores_sha256_checked": true,
+    "scores_rows": 188751,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold09",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold09_lb90_s0_poolB_universe\\eval_sealed_ft_fold09",
+    "val_window": [
+      "2007-01-03",
+      "2007-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "c07141e86982124369108abbe273f7fc3b6c3320109b3a710eeb7e015974fd9a",
+    "scores_sha256_checked": true,
+    "scores_rows": 187429,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold10",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold10_lb90_s0_poolB_universe\\eval_sealed_ft_fold10",
+    "val_window": [
+      "2007-07-03",
+      "2008-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "4ea59255a6e309aa109e2d4077dc249edd480eb7a3e9ee4b870207138b3096aa",
+    "scores_sha256_checked": true,
+    "scores_rows": 190325,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold11",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold11_lb90_s0_poolB_universe\\eval_sealed_ft_fold11",
+    "val_window": [
+      "2008-01-03",
+      "2008-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "6f9e9062826538d74dd777e0667e1f200c026636143cb7e7d2d08db88ad3fdc6",
+    "scores_sha256_checked": true,
+    "scores_rows": 188920,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold12",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold12_lb90_s0_poolB_universe\\eval_sealed_ft_fold12",
+    "val_window": [
+      "2008-07-03",
+      "2009-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "23ae6f16daf18dd5e45680e6e900c07dffb510b42c993f5b0a50c08982427b13",
+    "scores_sha256_checked": true,
+    "scores_rows": 183848,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold13",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold13_lb90_s0_poolB_universe\\eval_sealed_ft_fold13",
+    "val_window": [
+      "2009-01-05",
+      "2009-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "6a9f06e31975908756b3f4f155553695a9f9fcc7fbc2798b88729e703b9923da",
+    "scores_sha256_checked": true,
+    "scores_rows": 163289,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold14",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold14_lb90_s0_poolB_universe\\eval_sealed_ft_fold14",
+    "val_window": [
+      "2009-07-06",
+      "2009-12-31"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "254e95aea8aba64c8fc98a13c96f50cfea0d38274311849cfd6fc8cd1537662d",
+    "scores_sha256_checked": true,
+    "scores_rows": 175090,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold15",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold15_lb90_s0_poolB_universe\\eval_sealed_ft_fold15",
+    "val_window": [
+      "2010-01-04",
+      "2010-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "6caa569cf1b6f7151356b40f49cf1aef46f6b4da7401bd35da78535ec0b39136",
+    "scores_sha256_checked": true,
+    "scores_rows": 182710,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold16",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold16_lb90_s0_poolB_universe\\eval_sealed_ft_fold16",
+    "val_window": [
+      "2010-07-06",
+      "2010-12-31"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "a3c6cffd57ea5773080cfd1fb20efdd97a6bfda604b56dfcec5a17be60174306",
+    "scores_sha256_checked": true,
+    "scores_rows": 179123,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold17",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold17_lb90_s0_poolB_universe\\eval_sealed_ft_fold17",
+    "val_window": [
+      "2011-01-03",
+      "2011-07-01"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "c46d44aa76573415e53a831c46106bde6ca974a223c39465b2fa8e8a83be6cfe",
+    "scores_sha256_checked": true,
+    "scores_rows": 188133,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold18",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold18_lb90_s0_poolB_universe\\eval_sealed_ft_fold18",
+    "val_window": [
+      "2011-07-05",
+      "2011-12-30"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "658e1e70b09bdbeb3a1f4fae2abba5e7d5c0974f3552b0e176440ec92cbd5d5b",
+    "scores_sha256_checked": true,
+    "scores_rows": 186741,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold19",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold19_lb90_s0_poolB_universe\\eval_sealed_ft_fold19",
+    "val_window": [
+      "2012-01-03",
+      "2012-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "454d1e61d1b9b87452f82dfc1c3ced3f242fa5960d44db4cdab23dd0d19e8ee3",
+    "scores_sha256_checked": true,
+    "scores_rows": 183608,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold20",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold20_lb90_s0_poolB_universe\\eval_sealed_ft_fold20",
+    "val_window": [
+      "2012-07-03",
+      "2013-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "c0cdf7d5fab298f937864265cf5e2ccf9d1f35269531f7a25aeccc698a1e63c7",
+    "scores_sha256_checked": true,
+    "scores_rows": 174009,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold21",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold21_lb90_s0_poolB_universe\\eval_sealed_ft_fold21",
+    "val_window": [
+      "2013-01-03",
+      "2013-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "dd32d04e56178146e81aebb0e16a3e43a9e05f06cf34598a445cadcda785357a",
+    "scores_sha256_checked": true,
+    "scores_rows": 185876,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold22",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold22_lb90_s0_poolB_universe\\eval_sealed_ft_fold22",
+    "val_window": [
+      "2013-07-03",
+      "2014-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "503e9023d9e0b1265f2e8a7aa482c76663b675f5a4af29da3e6b4066b96f06f0",
+    "scores_sha256_checked": true,
+    "scores_rows": 190311,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold23",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold23_lb90_s0_poolB_universe\\eval_sealed_ft_fold23",
+    "val_window": [
+      "2014-01-03",
+      "2014-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "5d388eb9e2d3544ee61648e09ce61a8e6cb8ea0b59f7c61a32392a9ac4bf6de8",
+    "scores_sha256_checked": true,
+    "scores_rows": 187111,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold24",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold24_lb90_s0_poolB_universe\\eval_sealed_ft_fold24",
+    "val_window": [
+      "2014-07-03",
+      "2015-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "61339a7c3257e4a51bf986b63ba4b3acd37c6c56dc1c659e529da304e4a467dd",
+    "scores_sha256_checked": true,
+    "scores_rows": 190301,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold25",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold25_lb90_s0_poolB_universe\\eval_sealed_ft_fold25",
+    "val_window": [
+      "2015-01-05",
+      "2015-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "bfbe0d34413c63ac2cd8897f336fc7980bff156dd75dcac1a40bfb7fdb61f03a",
+    "scores_sha256_checked": true,
+    "scores_rows": 187307,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold26",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold26_lb90_s0_poolB_universe\\eval_sealed_ft_fold26",
+    "val_window": [
+      "2015-07-06",
+      "2015-12-31"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "9a888a6d389399ddec2b3d28b607e664f54db95cb39b967713167383e0f08698",
+    "scores_sha256_checked": true,
+    "scores_rows": 188800,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold27",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold27_lb90_s0_poolB_universe\\eval_sealed_ft_fold27",
+    "val_window": [
+      "2016-01-04",
+      "2016-07-01"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "afbb5d8b23dd92e67c7de418b6f5b5fd5fad8fc621338769b36b7052066ae7c2",
+    "scores_sha256_checked": true,
+    "scores_rows": 188753,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold28",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold28_lb90_s0_poolB_universe\\eval_sealed_ft_fold28",
+    "val_window": [
+      "2016-07-05",
+      "2016-12-30"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "26e275fbc2fd9ece83f28f8d930d27629e721413b46b77cfd9ef4f9fb9ab4965",
+    "scores_sha256_checked": true,
+    "scores_rows": 188786,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold29",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold29_lb90_s0_poolB_universe\\eval_sealed_ft_fold29",
+    "val_window": [
+      "2017-01-03",
+      "2017-06-30"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "a1066dcdb967de08f8c5951010855fd482f1d0bbbc2f2caa04e30f0519a56cd2",
+    "scores_sha256_checked": true,
+    "scores_rows": 187500,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold30",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold30_lb90_s0_poolB_universe\\eval_sealed_ft_fold30",
+    "val_window": [
+      "2017-07-03",
+      "2018-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "67fedddbd1b655201c44e6b701474a92ecfa9fb4346f4c24c1b6e151dde4779b",
+    "scores_sha256_checked": true,
+    "scores_rows": 190356,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold31",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold31_lb90_s0_poolB_universe\\eval_sealed_ft_fold31",
+    "val_window": [
+      "2018-01-03",
+      "2018-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "e6ca6cdf00ef49ea052a65ea1cb1ad84851f82b29269339b2d12c804b8e563e8",
+    "scores_sha256_checked": true,
+    "scores_rows": 187300,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold32",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold32_lb90_s0_poolB_universe\\eval_sealed_ft_fold32",
+    "val_window": [
+      "2018-07-03",
+      "2019-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "9d652a02c5035b6b19b51206939036e8b96b32b06858befb87c623d1def5654c",
+    "scores_sha256_checked": true,
+    "scores_rows": 188762,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold33",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold33_lb90_s0_poolB_universe\\eval_sealed_ft_fold33",
+    "val_window": [
+      "2019-01-03",
+      "2019-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "5dc489d7910c4858daad048f93067ede4867d5983a62722059bfd4cd31c4271f",
+    "scores_sha256_checked": true,
+    "scores_rows": 187448,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold34",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold34_lb90_s0_poolB_universe\\eval_sealed_ft_fold34",
+    "val_window": [
+      "2019-07-03",
+      "2020-01-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "a11ef093a6d3e1dae668c5cdb774e4f1d9b4c311d492de0813f6f19f0cd7f294",
+    "scores_sha256_checked": true,
+    "scores_rows": 190414,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  },
+  {
+    "fold": "fold35",
+    "arm": "ft",
+    "eval_dir": "F:\\quant\\us-quant-pipeline\\outputs\\fold35_lb90_s0_poolB_universe\\eval_sealed_ft_fold35",
+    "val_window": [
+      "2020-01-03",
+      "2020-07-02"
+    ],
+    "scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "scores_sha256": "abca4c260b2fff6dbe24886ec8a767633e244eec9978723d544701a5e2a824b3",
+    "scores_sha256_checked": true,
+    "scores_rows": 188756,
+    "snapshot_id": "crsp_ciz_2026-08-24_20260825T130601Z",
+    "code_sha256": {
+      "kronos_ft/train.py": "fdb7c6fdfe19b5859a6ec56cb2de90a063511a65a256ac6f9e7f86e8b6588595",
+      "kronos_ft/infer.py": "da27426abc2d492a664af4b0e2f3cb604381da771f186bc1a2e7bb72424ebfae",
+      "kronos_ft/models.py": "09c36ff8ab8dc76e4b3507ee4385cdff432bb90c0c29559971bd67ea86e3a0e1",
+      "kronos_ft/windows.py": "46c0250c925ec7925aab0ad4be5a19028f1c6c940dfbf29c72d0764b99783bff",
+      "crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+      "scripts/evaluate_fold.py": "e227569521ffb12e57105a4e22a9f6430b1b4b75602432f0666da97ba7b81e56"
+    }
+  }
+]

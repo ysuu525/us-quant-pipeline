@@ -1,0 +1,257 @@
+{
+  "protocol_path": "experiments/confirmation_protocol_v4.md",
+  "protocol_sha256": "c3c823e2189f53137f158c04dca6240022a03774e28a57388c3556fd65bcfe3d",
+  "protocol_tag": "prereg-2026-09-05-v4",
+  "addendum_path": "experiments/confirmation_protocol_v4.1_addendum_2026-09-05.md",
+  "addendum_sha256": "1032112bd10f1503f588963cfed515a06d953358cc19b2294c5ef236a0f05a2d",
+  "run_id": "unseal_20260905T151817Z",
+  "run_utc": "2026-09-05T15:18:18+00:00",
+  "mode": "real",
+  "git_commit": "ef7746373bdd3e7dff34dad34823873fe3973e6e",
+  "git_porcelain_lines": 15,
+  "config_sha256": "e7571e3fa50db80b29060b529d55ef6980031ea7e89305705e7634e925cd8487",
+  "frozen_config": {
+    "confirm_folds": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35
+    ],
+    "clean_window_folds": [
+      44,
+      45
+    ],
+    "arms_in_read_order": [
+      "ft",
+      "zs"
+    ],
+    "arms_default": [
+      "ft"
+    ],
+    "required_scoring_config": {
+      "lookback": 90,
+      "predict": 6,
+      "sample_count": 5,
+      "amp": "bf16",
+      "batch_size": 128
+    },
+    "construction": {
+      "nt": 5,
+      "topn": 500,
+      "exit_pct": 0.3,
+      "min_names": 50,
+      "entry_pct": 0.1,
+      "predict_window": 6,
+      "execution": "t close score -> t+1 open"
+    },
+    "inference": {
+      "nw_lag": 5,
+      "h6_nw_lag": 6,
+      "z95": 1.959963984540054,
+      "z_bonferroni_k2": 2.241402727604947,
+      "power_mult_80": 2.8016,
+      "h2_positive_folds_gate": 18
+    },
+    "h1_dev_base": {
+      "ft": 0.0207,
+      "zs": 0.01919
+    },
+    "h1_main_prediction": {
+      "ft": [
+        0.0088812,
+        0.018225
+      ],
+      "zs": [
+        0.0080529,
+        0.0170925
+      ]
+    },
+    "h1_sensitivity_prediction": [
+      0.0149,
+      0.0166
+    ],
+    "excluded_signal_dates": {
+      "dates": [
+        "2020-07-01",
+        "2020-07-02"
+      ],
+      "fold": 35,
+      "rule": "v4.1 附录 §5：表 B 的 fold35（止于 2020-07-02）与表 A 的开发 fold36（起于 2020-07-01）重叠 2 个交易日，这两个信号日在开发阶段已被读过；读取时从 fold35 的一切统计中剔除（FT 与树基线两侧），且在标签计算之前剔除，使折 05–35 严格为「未消耗」"
+    },
+    "era": {
+      "cut": "2013-01-01",
+      "early_folds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "late_folds": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "mde80_interaction": {
+        "delta_adv": {
+          "ft": 0.0073,
+          "zs": 0.00789
+        },
+        "ic_top500": {
+          "ft": 0.01923,
+          "zs": 0.01955
+        }
+      }
+    },
+    "cost_grid_bp": [
+      2,
+      4,
+      8,
+      12,
+      16,
+      22
+    ],
+    "be_dev_bp": {
+      "ft": 22.9,
+      "zs": 16.4
+    },
+    "deployment": {
+      "h_main": 0.42,
+      "h_sensitivity": [
+        0.399,
+        0.44
+      ],
+      "h_legacy_deprecated": 0.25,
+      "reserve_bp": 6.0,
+      "c_stop_bp": 4.0
+    },
+    "h1b": {
+      "default_enabled": true,
+      "primary_spec": "S-TH-ind",
+      "specs": [
+        "S-TH-ind",
+        "S-T",
+        "S-H"
+      ],
+      "arms": [
+        "ft"
+      ],
+      "nt": 6
+    },
+    "h3": {
+      "arm": "ft",
+      "tree_dir_template": "gbdt_strong_jkp_v2/xgboost/sealed/fold{f:02d}",
+      "mde80_dev7": 0.0329,
+      "mde80_31fold": 0.0156,
+      "sesoi_candidates": [
+        0.0072,
+        0.0108
+      ]
+    },
+    "h6": {
+      "markers": [
+        "P1_bull",
+        "P1_bear"
+      ],
+      "questions": [
+        "Q1",
+        "Q2b"
+      ],
+      "sesoi_bp": 10.0
+    }
+  },
+  "code_sha256": {
+    "scripts/unseal_read_confirm.py": "1e1b28de3ae856c85db067e29c10dfe0a42fe0628c27d5e78f5ad3e31c1eb8e5",
+    "scripts/exp11_spanning_extended.py": "ba6ecc8b96b249a959adafa42a1d2e79b6cba739d72d52c0e620a4d572072b3b",
+    "scripts/ict_pattern_probe.py": "2418b65c2547e4a6e712fc4dd57a424b0aecaa1e82203c7bb14bf54b7b05d09f",
+    "src/unseal/__init__.py": "61640d6fe834c877a48bd68e4d06d399ae9acfff0887131545f6acecbffb1178",
+    "src/unseal/config.py": "e1eb941f1fb22a41671c6fa48ef1662be10a60aa998e85fd0eba2a9bed6a7ca4",
+    "src/unseal/paths.py": "c6f6adf4b37521f2b39b510c229486701d2f925c621bfceb3a8e7000c6e845f0",
+    "src/unseal/folds.py": "13dcca8717d459420455bc556324db4997dfc3db1633995d5b55d8ecfa7d4fa7",
+    "src/unseal/perfold.py": "d0d1961fe31947943b657e67cde810dd6baaedbbfec4bb22143c2c2f49df3aca",
+    "src/unseal/aggregate.py": "f9c31b32ef7d1b0fdaa8ffa4d17723bbbc91b4e478459c60a273808a5d32823d",
+    "src/unseal/h1b.py": "2d447b28ca2902722b80766805e0bcb2ab441ce03c37d3e02ded077d9758a60e",
+    "src/unseal/h3.py": "8cd77c0a0d482337f493702b8a1f84a1c2920638b4a374099e3f86f9ab6e3231",
+    "src/unseal/h6.py": "7755a377779bbecc82591f4c3b06e3b191d0cff5e8108b9d9135ba2a8f3cc0b6",
+    "src/unseal/report.py": "55daa2f73869852549d01b8327a5c09f720b18cb47bb3f1673ae297f13dccbbc",
+    "src/unseal/smoke.py": "b8b17052618705a6d56c713d84e30f98feca1c524f5d7c78d47875be9ccb8630",
+    "src/crsp_pipeline/sealed.py": "e2c8dc027e1c4be7ba7e1ad1b1b6308d1a7eec27c986408573fb30bb26f3d754",
+    "src/crsp_pipeline/labels.py": "d3801ef0461b718417180d6bec77e79a1156eba3f8cefcac8bf42582a5c0bcb6",
+    "src/crsp_pipeline/signal_eval.py": "2ea631c5e985f14982c8771aefc7f601e2732fd48d0d84e918e2ddd90592427e",
+    "src/crsp_pipeline/splits.py": "a9b93344a1266d1130a04df14afc4d19c76e43f85e013225e6606ca2c77a1f29",
+    "src/portfolio/construction.py": "8af2b372e91f495eb1a12c6eb32782116763736582085be7c82ad2a792ba99ab",
+    "src/backtest/money.py": "f920a7815827ef08522b9c304dc2474137f99fc3b5a2a8eb70a2ac323208efd1",
+    "src/signals/kronos_adapter.py": "d5dffdaacbb507531dfdd93f1e0b16d64ce5d5b162af2c2577914166afc8b94d"
+  },
+  "code_sha256_of_snapshot": "a2bd8ed93ae9a47757b3526b292c7fd924fd04a58c9a4ffcb66bc2a1f1455a9d",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "argv": [
+    "--out",
+    "outputs/unseal_20260905T151817Z",
+    "--clean-window",
+    "--memory-limit-gb",
+    "52",
+    "--authorised-by-user",
+    "ledger:689"
+  ],
+  "authorisation_ref": "ledger:689",
+  "arms_read": [
+    "ft"
+  ],
+  "zs_dropped": true,
+  "excluded_signal_dates": [
+    "2020-07-01",
+    "2020-07-02"
+  ],
+  "excluded_signal_dates_fold": 35
+}
