@@ -117,6 +117,15 @@ CODE_SNAPSHOT_FILES = (
 )
 
 
+#: ``--clean-window-only`` 时写进 ``run_meta.json`` 的口径说明。
+CONFIRM_NOT_READ_NOTE = (
+    "确认段（折 05–35）未在本次运行中读取：本次只跑干净窗 fold44–45，"
+    "未打开确认集任何一折的封存分数或标签，确认段仍为「未消耗」。")
+#: ``--no-h3`` 时干净窗报告页头的强制披露（v4 §6）。
+CLEAN_WINDOW_NO_H3_NOTE = (
+    "H3 未在干净窗交付（v4 §6 干净窗无 H3 终点；树基线封存仅覆盖折 05–35）")
+
+
 def log(msg: str) -> None:
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
 
@@ -346,6 +355,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--clean-window", action="store_true",
                     help="另跑 fold44–45（干净窗），**独立输出目录、独立报告，"
                          "不并入 31 折合并统计**")
+    ap.add_argument("--clean-window-only", action="store_true",
+                    help="**只**跑干净窗 fold44–45，跳过确认段（折 05–35）：隐含 "
+                         "--clean-window，不调用确认段 run_scope、不生成 report.md。"
+                         "与 --folds 互斥（确认段的折号在本模式下无意义）。"
+                         "--authorised-by-user 闸门照旧生效。")
     ap.add_argument("--processed", type=Path, default=DEFAULT_PROCESSED)
     ap.add_argument("--outputs-root", type=Path, default=REPO_ROOT / "outputs")
     ap.add_argument("--jkp", type=Path, default=DEFAULT_JKP)
@@ -389,6 +403,13 @@ def check_authorisation(ref: str | None) -> str:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.clean_window_only:
+        if args.folds is not None:
+            raise SystemExit(
+                "--clean-window-only 只跑干净窗 "
+                f"fold{min(C.CLEAN_WINDOW_FOLDS):02d}–{max(C.CLEAN_WINDOW_FOLDS):02d}，"
+                "确认段（折 05–35）本次不读，--folds 无处可用：两者不得同时给出。")
+        args.clean_window = True          # 隐含
     out = Path(args.out)
     if not out.is_absolute():
         out = REPO_ROOT / out
@@ -410,6 +431,8 @@ def main() -> int:
         log("合成假数据全链路（读数无任何含义，不得记入登记簿）...")
         if args.folds is None:
             folds = DEFAULT_SMOKE_FOLDS
+        if args.clean_window_only:
+            folds = ()                    # 确认段不跑，合成工作区也不造那些折
         ws_folds = tuple(folds) + (tuple(clean_folds) if args.clean_window else ())
         ws = build_workspace(out / "_smoke_workspace", n_permno=args.smoke_permnos,
                              folds=ws_folds)
@@ -419,7 +442,13 @@ def main() -> int:
         authorisation = check_authorisation(args.authorised_by_user)
 
     t0 = time.perf_counter()
+    scope_mode = ("clean_window_only" if args.clean_window_only
+                  else ("confirm+clean_window" if args.clean_window else "confirm"))
     run_meta = build_run_meta(out, args) | {"authorisation_ref": authorisation,
+                                        "scope_mode": scope_mode,
+                                        "scope_note": (
+                                            CONFIRM_NOT_READ_NOTE
+                                            if args.clean_window_only else None),
                                         "arms_read": list(arms),
                                         "zs_dropped": "zs" not in arms,
                                         "excluded_signal_dates":
@@ -429,17 +458,20 @@ def main() -> int:
     (out / "run_meta.json").write_text(
         json.dumps(run_meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    payload = run_scope(scope_name="confirm", folds=tuple(folds), out=out,
-                        processed=processed, outputs_root=outputs_root, jkp=jkp,
-                        run_meta=run_meta, args=args, arms=arms)
-    lo = min(folds)
-    hi = max(folds)
-    (out / "report.md").write_text(
-        render_report(payload, title="解封读取报告 —— 确认集",
-                      scope=f"折 {lo:02d}–{hi:02d}（{len(folds)} 折）",
-                      n_folds=len(folds)),
-        encoding="utf-8")
-    log(f"确认集报告 → {out / 'report.md'}")
+    if args.clean_window_only:
+        log(f"--clean-window-only：{CONFIRM_NOT_READ_NOTE}")
+    else:
+        payload = run_scope(scope_name="confirm", folds=tuple(folds), out=out,
+                            processed=processed, outputs_root=outputs_root, jkp=jkp,
+                            run_meta=run_meta, args=args, arms=arms)
+        lo = min(folds)
+        hi = max(folds)
+        (out / "report.md").write_text(
+            render_report(payload, title="解封读取报告 —— 确认集",
+                          scope=f"折 {lo:02d}–{hi:02d}（{len(folds)} 折）",
+                          n_folds=len(folds)),
+            encoding="utf-8")
+        log(f"确认集报告 → {out / 'report.md'}")
 
     if args.clean_window and clean_folds:
         cw = out / "clean_window"
@@ -453,9 +485,15 @@ def main() -> int:
                 scope=f"折 {min(clean_folds):02d}–{max(clean_folds):02d}"
                       "（2024-07 起，合计 1 年；预期 t / 非中心参数约 0.65，"
                       "只作洁净复核与效应估计，**不承担最终二元裁决**）",
-                n_folds=len(clean_folds)),
+                n_folds=len(clean_folds),
+                notes=() if args.h3 else (CLEAN_WINDOW_NO_H3_NOTE,)),
             encoding="utf-8")
         log(f"干净窗报告 → {out / 'report_fold44_45.md'}")
+        if args.clean_window_only:
+            # 本次运行只有干净窗一段：顶层 summary.json 也只含 clean_window 部分
+            (out / "summary.json").write_text(
+                json.dumps(payload_cw, ensure_ascii=False, indent=2, default=float),
+                encoding="utf-8")
 
     log(f"完成，总耗时 {(time.perf_counter() - t0) / 60:.1f} 分钟 → {out}")
     return 0

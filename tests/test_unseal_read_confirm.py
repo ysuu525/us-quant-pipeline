@@ -332,6 +332,59 @@ def test_clean_window_is_a_separate_delivery(smoke_run):
     assert (out / "report_fold44_45.md").is_file()
 
 
+def test_clean_window_only_skips_the_confirm_scope(tmp_path):
+    """``--clean-window-only``：只跑干净窗 fold44–45，确认段折 05–35 一折不读。
+
+    盯的是纪律：确认段既不生成目录也不生成报告（未消耗），``run_meta.json`` 的
+    ``scope_mode`` 如实记录，``--no-h3`` 在干净窗的页头有强制披露，
+    且 ``--folds`` 与本开关互斥（被拒的运行不留下任何痕迹）。
+    """
+    out = tmp_path / "unseal_smoke_cwonly"
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    proc = subprocess.run(
+        [sys.executable, str(ENTRY), "--smoke", "--clean-window-only", "--no-h3",
+         "--out", str(out), "--smoke-permnos", "60",
+         "--memory-limit-gb", "1000000"],
+        cwd=REPO, capture_output=True, text=True, timeout=3600, env=env,
+        encoding="utf-8", errors="replace",
+    )
+    assert proc.returncode == 0, (proc.stdout or "")[-4000:] + (proc.stderr or "")[-4000:]
+
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["scope_mode"] == "clean_window_only"
+    assert "未在本次运行中读取" in meta["scope_note"]
+
+    # 确认段：无报告、无口径核对、无逐折目录
+    assert not (out / "report.md").exists()
+    assert not (out / "caliber_check.json").exists()
+    assert not (out / "per_fold_index.json").exists()
+    for f in SMOKE_FOLDS:
+        assert not (out / "ft" / f"fold{f:02d}").exists()
+
+    # 干净窗：独立目录 + 独立报告；两处 summary.json 都只含 clean_window 部分
+    for rel in ("summary.json", "clean_window/summary.json"):
+        payload = json.loads((out / rel).read_text(encoding="utf-8"))
+        assert payload["scope"] == "clean_window"
+        assert payload["folds_count"] == len(C.CLEAN_WINDOW_FOLDS)
+        assert "h3" not in payload                      # --no-h3
+    for f in C.CLEAN_WINDOW_FOLDS:
+        assert (out / "clean_window" / "ft" / f"fold{f:02d}").is_dir()
+    head = (out / "report_fold44_45.md").read_text(encoding="utf-8")[:3000]
+    assert "H3 未在干净窗交付" in head
+
+    # --clean-window-only 与 --folds 互斥，且被拒时连输出目录都不建
+    nope = tmp_path / "nope"
+    bad = subprocess.run(
+        [sys.executable, str(ENTRY), "--smoke", "--clean-window-only",
+         "--out", str(nope), "--folds", "5-6"],
+        cwd=REPO, capture_output=True, text=True, timeout=300, env=env,
+        encoding="utf-8", errors="replace",
+    )
+    assert bad.returncode != 0
+    assert "--folds" in (bad.stderr or "") + (bad.stdout or "")
+    assert not nope.exists()
+
+
 # ------------------------------------------------------------------ 统计口径
 
 def test_delta_adv_uses_lagged_adv_top500():

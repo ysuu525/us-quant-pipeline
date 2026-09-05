@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from . import config as C
@@ -383,8 +384,12 @@ def _e(lines: list, res: dict) -> None:
 
 
 def render_report(payload: dict[str, Any], *, title: str, scope: str,
-                  n_folds: int) -> str:
-    """把汇总字典渲染成 Markdown。``scope`` 形如「折 05–35（31 折，2005–2020）」。"""
+                  n_folds: int, notes: Sequence[str] = ()) -> str:
+    """把汇总字典渲染成 Markdown。``scope`` 形如「折 05–35（31 折，2005–2020）」。
+
+    ``notes`` 是页头的附加披露行（如「H3 未在干净窗交付」），逐条以 ``- **…**``
+    追加在页头末尾；受本模块三条硬约束同样约束（不得含读数、不得出现折号）。
+    """
     meta = payload.get("run_meta", {})
     lines: list[str] = [
         f"# {title}", "",
@@ -417,6 +422,8 @@ def render_report(payload: dict[str, Any], *, title: str, scope: str,
         "amp bf16 / batch_size 128）",
         "",
     ]
+    if notes:
+        lines[-1:-1] = [f"- **{n}**" for n in notes]
     if meta.get("zs_dropped"):
         lines += ["", "> **【实测】ZS 臂的处置（随确认结果一并披露）**：" + C.ZS_DROPPED_NOTE, ""]
     _h1(lines, payload.get("h1", {}), n_folds)
