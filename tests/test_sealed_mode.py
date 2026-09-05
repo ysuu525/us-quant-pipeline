@@ -96,16 +96,31 @@ def test_each_completed_sealed_dir_is_clean(sub):
 # ---- 轻量纪律：普通分析脚本不得引用封存产物（替代批量改 18 个脚本）----
 
 SEALED_MARKERS = ("sealed_confirm", "eval_sealed")
-# 只有这些文件有正当理由提到封存标识
+# 只有这些文件有正当理由提到封存标识。``xxx/*`` 是前缀通配（整个子目录）。
 MARKER_ALLOWLIST = {
     "src/crsp_pipeline/sealed.py",
     "tests/test_sealed_mode.py",
+    # 2026-09-05 解封读取（任务书 §1 G0）：唯一入口与其实现包。
+    # src/unseal/paths.py 是全仓库唯一知道封存目录命名的模块。
+    "scripts/unseal_read_confirm.py",
+    "src/unseal/*",
+    "tests/test_unseal_read_confirm.py",
 }
 # unseal 是解封开关；splits.py 的 sealed_oos_window 是既有 API
 UNSEAL_ALLOWLIST = MARKER_ALLOWLIST | {
     "src/crsp_pipeline/splits.py",
     "tests/test_splits.py",
+    # 显式的 unseal 参数：只把封存折号的路径解析转交 unseal.paths，
+    # **不放宽 ALLOWED_FOLDS**（见该模块 docstring）。
+    "src/signals/kronos_adapter.py",
 }
+
+
+def _in_allowlist(rel: str, allowlist: set[str]) -> bool:
+    if rel in allowlist:
+        return True
+    return any(entry.endswith("/*") and rel.startswith(entry[:-1])
+               for entry in allowlist)
 
 
 def _py_sources():
@@ -119,7 +134,7 @@ def test_no_ordinary_script_references_sealed_outputs():
     任何普通分析脚本都不得写死封存目录或封存 tag 前缀。"""
     bad = []
     for f, rel in _py_sources():
-        if rel in MARKER_ALLOWLIST:
+        if _in_allowlist(rel, MARKER_ALLOWLIST):
             continue
         txt = f.read_text(encoding="utf-8", errors="ignore")
         hits = [m for m in SEALED_MARKERS if m in txt]
@@ -132,19 +147,46 @@ def test_no_ordinary_script_references_sealed_outputs():
 def test_unseal_switch_is_not_used_casually():
     bad = []
     for f, rel in _py_sources():
-        if rel in UNSEAL_ALLOWLIST:
+        if _in_allowlist(rel, UNSEAL_ALLOWLIST):
             continue
         if "unseal" in f.read_text(encoding="utf-8", errors="ignore"):
             bad.append(rel)
     assert not bad, f"以下脚本使用了 unseal 解封开关，须先取得读取授权: {bad}"
 
 
+def _ledger_type(line: str) -> str:
+    """登记行的类型字段 = 第二个「|」分隔字段（append_ledger 的固定格式）。"""
+    parts = line.split("|")
+    return parts[1].strip() if len(parts) >= 3 else ""
+
+
 def test_sealed_ledger_lines_carry_no_metrics():
+    """只查**类型字段为 sealed-compute** 的行。
+
+    早先版本用子串匹配，会把正文里提到「sealed-compute 行」的授权 / 诊断条目
+    （如 2026-09-05 的 `authorisation-and-sealed-mode`）一并卷进来误判。
+    登记簿是 append-only、改不得，因此收严的是判据本身。
+    """
     if not LEDGER.exists():
         pytest.skip("no ledger")
     bad = [ln for ln in LEDGER.read_text(encoding="utf-8").splitlines()
-           if "sealed-compute" in ln and METRIC_TOKENS.search(ln)]
+           if _ledger_type(ln) == "sealed-compute" and METRIC_TOKENS.search(ln)]
     assert not bad, f"封存登记条目里出现绩效字段: {bad}"
+
+
+def test_ledger_type_field_matcher_is_narrow_but_still_catches_real_lines():
+    """收严后的判据必须仍抓真条目、且不再误伤正文提及。"""
+    real = ("- 2026-09-01T07:52:56+00:00 | sealed-compute | tag=sealed_ft_fold05 "
+            "val=[2005-01-03..2005-07-01] rows=185441 （封存打分：未生成 labels）")
+    mention = ("- 2026-09-05 | authorisation-and-sealed-mode | 登记簿只允许追加"
+               "不含指标的 `sealed-compute` 行；不得计算任何 IC / 收益 / 分层统计。")
+    assert _ledger_type(real) == "sealed-compute"
+    assert _ledger_type(mention) == "authorisation-and-sealed-mode"
+    # 正文提及确实带绩效词——旧的子串判据正是被它误判的
+    assert METRIC_TOKENS.search(mention)
+    if LEDGER.exists():
+        lines = LEDGER.read_text(encoding="utf-8").splitlines()
+        assert sum(1 for ln in lines if _ledger_type(ln) == "sealed-compute") > 0
 
 
 def test_allowed_and_forbidden_sets_are_disjoint():

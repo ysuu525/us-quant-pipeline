@@ -1,9 +1,14 @@
 """读取 Kronos（信号 #1）已有的开发折分数，供信号 #2 做相关性与合成读数。
 
-**只读、只碰已消耗的开发折。** 允许的折号硬编码为 :data:`ALLOWED_FOLDS`
+**默认只读、只碰已消耗的开发折。** 允许的折号硬编码为 :data:`ALLOWED_FOLDS`
 = {1, 2, 3, 4, 36, …, 42}——这 11 折已被数十次决策读数消耗（CLAUDE.md §四），
-其读数是方向性证据；折 05–35 与 2024-07 起的窗口**不得经此模块读取**，
-传入即 ``ValueError``，不提供任何绕过开关。
+其读数是方向性证据；折 05–35 与 2024-07 起的窗口**不得经默认路径读取**，
+传入即 ``ValueError``。
+
+唯一的例外是显式的 ``unseal=True``（2026-09-05 加入）：用户就「读取折 05–35 /
+封存窗」另行授权后，`scripts/unseal_read_confirm.py` 传它取封存分数路径。
+该开关**不放宽** :data:`ALLOWED_FOLDS`，只接受 :data:`SEALED_FOLDS`，
+并把路径解析整个转交 :mod:`unseal.paths`（本模块不知道封存目录的命名）。
 
 每次打开文件前先过 ``crsp_pipeline.sealed.assert_readable``：路径若落在带哨兵的
 目录之下会直接抛错。守卫在**每个文件**上调用，不做一次性检查——目录布局将来
@@ -57,6 +62,13 @@ ARMS: tuple[str, ...] = ("ft", "zs")
 EARLY_FOLDS: tuple[int, ...] = (1, 2, 3, 4)
 MODERN_FOLDS: tuple[int, ...] = tuple(range(36, 43))
 ALLOWED_FOLDS: frozenset[int] = frozenset(EARLY_FOLDS + MODERN_FOLDS)
+
+#: 封存折号（05–35 确认集 + 44–45 干净窗）。**它不在 :data:`ALLOWED_FOLDS` 里，
+#: 且本模块不放宽 ALLOWED_FOLDS**：默认路径永远只认已消耗的开发折。
+#: 只有显式传 ``unseal=True``（解封授权后，`scripts/unseal_read_confirm.py` 是
+#: 唯一这么传的调用方）才会走封存路径，并且路径解析整个转交
+#: :mod:`unseal.paths`——本模块因此不知道封存目录的命名。
+SEALED_FOLDS: frozenset[int] = frozenset(tuple(range(5, 36)) + (44, 45))
 
 # 实验 3 / 9 的 GPU 重打分矩阵。显式枚举，防止调用方用任意 tag 绕过路径纪律。
 EXPERIMENT_SCORE_FOLDS: dict[str, frozenset[int]] = {
@@ -112,8 +124,17 @@ def _check_arm(arm: str) -> str:
 
 
 def eval_dir(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT, *,
-             experiment_tag: str | None = None) -> Path:
-    """该折该臂的评估目录（不检查是否存在）。"""
+             experiment_tag: str | None = None, unseal: bool = False) -> Path:
+    """该折该臂的评估目录（不检查是否存在）。
+
+    ``unseal=True`` 只在用户就「读取折 05–35 / 2024-07 起封存窗」另行授权后才可传，
+    且只接受 :data:`SEALED_FOLDS` 里的折号；**不放宽 :data:`ALLOWED_FOLDS`**。
+    """
+    if unseal:
+        if experiment_tag is not None:
+            raise ValueError("解封路径不接受实验重打分 tag")
+        from unseal.paths import sealed_eval_dir   # 延迟导入：默认路径不加载解封模块
+        return sealed_eval_dir(fold_id, _check_arm(arm), root)
     f, a = _check_fold(fold_id), _check_arm(arm)
     root = Path(root)
     if experiment_tag is not None:
@@ -138,9 +159,9 @@ def eval_dir(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT, *,
 
 
 def scores_path(fold_id: int, arm: Arm, root: Path | str = DEFAULT_ROOT, *,
-                experiment_tag: str | None = None) -> Path:
-    return eval_dir(fold_id, arm, root,
-                    experiment_tag=experiment_tag) / "scores.parquet"
+                experiment_tag: str | None = None, unseal: bool = False) -> Path:
+    return eval_dir(fold_id, arm, root, experiment_tag=experiment_tag,
+                    unseal=unseal) / "scores.parquet"
 
 
 def labels_path(fold_id: int, arm: Arm = "ft",

@@ -64,6 +64,22 @@ SESOI = 10 bp / 6 日持有期。MDE = 2.80 × NW SE（双侧 5%、功效 80%）
 -------------------------
 纯 CPU（不碰 GPU）；面板读取列裁剪 + 日期下推 + PERMNO 过滤 + 逐 PERMNO 分组；
 不装任何包；输出目录带互斥锁；分阶段落盘可断点续跑。
+
+折 / 块 / 标记 / 问题的注入（2026-09-05 新增，**默认行为逐位不变**）
+--------------------------------------------------------------------
+:func:`configure` 与同名 CLI 开关允许把 ``FOLDS`` / ``BLOCKS`` / ``MARKER_COLS`` /
+``QUESTIONS`` / ``EVAL_ROOT`` / ``PANEL`` / ``UNIVERSE`` 换掉；不调用即用本文件顶部
+的冻结常量（11 个已消耗开发折、12 个标记、Q0/Q1/Q2a/Q2b）。
+
+唯一的注入用例是确认协议 v4 的 **H6**（由确认集解封读取的唯一入口脚本驱动；本脚本不引用它、也不知道封存目录的命名）：
+
+* **只跑 ``P1_bull`` / ``P1_bear``，只算 Q1 与 Q2(b)**（v4 §2.8.3；其余五概念按
+  `ledger:473` 已判「在本宇宙 × 6 日持有 × t+1 开盘执行下无可用读数」，不再计算）；
+* NW lag 仍为 6，SESOI 仍为 10bp/6 日，**标记定义与全部固定参数一字不改**；
+* Q2(b) 的五分位用 **Kronos FT 封存分数（sample_count=5）**，跑前须核对
+  ``SEALED_MANIFEST.json``（`CLAUDE.md` §八）——该核对由解封入口完成；
+* 分数与标签从解封入口写出的**未封存输出树**读取，本脚本不知道封存目录的命名；
+* H6 是**探索性估计交付**：不进 H1–H4 判定、不作部署依据、不产生 PASS/FAIL。
 """
 
 from __future__ import annotations
@@ -155,9 +171,57 @@ BLOCKS = {
 }
 PRIMARY_BLOCK = "late"
 
+# 评估目录的根（FOLDS 的值相对它解析）与要计算的问题；见 docstring 的注入说明。
+EVAL_ROOT = REPO_ROOT
+QUESTIONS: tuple[str, ...] = ("Q1", "Q2b", "Q2a")
+# P5/P6 是唯一的 O(n·validity) Python 循环；当要跑的标记里没有 P5/P6 时可跳过，
+# **P1–P4 与 computable 掩码逐位不变**（P5/P6 由 P2 派生，跳过只影响它们自己）。
+SKIP_P5P6 = False
+
 
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def configure(*, folds: dict[str, str] | None = None,
+              blocks: dict[str, dict] | None = None,
+              markers: list[str] | tuple[str, ...] | None = None,
+              questions: tuple[str, ...] | None = None,
+              eval_root: Path | None = None,
+              panel: Path | None = None,
+              universe: Path | None = None,
+              primary_block: str | None = None) -> None:
+    """注入折表 / 块 / 标记 / 问题 / 路径。**不调用即维持冻结默认。**
+
+    标记的**定义与固定参数一律不可注入**（L=20、ATR14、k=1.5、订单块回看 5、
+    有效期 20、实体 0.6、OTE [0.21,0.38]、NW lag 6、SESOI 10bp）——改了就是改预注册。
+    """
+    global FOLDS, BLOCKS, MARKER_COLS, MARKERS, EXPECTED_SIGN
+    global QUESTIONS, EVAL_ROOT, PANEL, UNIVERSE, PRIMARY_BLOCK, SKIP_P5P6
+    if folds is not None:
+        FOLDS = dict(folds)
+    if blocks is not None:
+        BLOCKS = dict(blocks)
+    if markers is not None:
+        unknown = [m for m in markers if m not in EXPECTED_SIGN]
+        if unknown:
+            raise ValueError(f"未知标记 {unknown}；标记集合由预注册 §3 冻结")
+        MARKER_COLS = list(markers)
+        MARKERS = [(m, EXPECTED_SIGN[m]) for m in MARKER_COLS]
+        SKIP_P5P6 = not any(m.startswith(("P5", "P6")) for m in MARKER_COLS)
+    if questions is not None:
+        bad = [q for q in questions if q not in ("Q1", "Q2b", "Q2a")]
+        if bad:
+            raise ValueError(f"未知问题 {bad}")
+        QUESTIONS = tuple(questions)
+    if eval_root is not None:
+        EVAL_ROOT = Path(eval_root)
+    if panel is not None:
+        PANEL = Path(panel)
+    if universe is not None:
+        UNIVERSE = Path(universe)
+    if primary_block is not None:
+        PRIMARY_BLOCK = primary_block
 
 
 # ------------------------------------------------------- 标记计算（核心，可测）
@@ -181,7 +245,8 @@ def _shift(a: np.ndarray, k: int) -> np.ndarray:
 
 
 def compute_patterns(
-    o: np.ndarray, h: np.ndarray, l: np.ndarray, c: np.ndarray
+    o: np.ndarray, h: np.ndarray, l: np.ndarray, c: np.ndarray,
+    skip_p5p6: bool = False,
 ) -> dict[str, np.ndarray]:
     """单只证券（按日期升序）的 12 个 ICT 标记 + 可算掩码。
 
@@ -234,7 +299,7 @@ def compute_patterns(
     p6_bull = np.zeros(n, dtype=bool)
     p6_bear = np.zeros(n, dtype=bool)
 
-    for t0 in np.flatnonzero(p2_bull):
+    for t0 in (() if skip_p5p6 else np.flatnonzero(p2_bull)):
         # 订单块 = t0 前 5 根内**最后一根**阴线（C<O）的 [Low, High]
         ob = None
         for j in range(t0 - 1, max(t0 - 1 - OB_LOOKBACK, -1), -1):
@@ -264,7 +329,7 @@ def compute_patterns(
                     p6_bull[t] = True
                     break
 
-    for t0 in np.flatnonzero(p2_bear):
+    for t0 in (() if skip_p5p6 else np.flatnonzero(p2_bear)):
         ob = None
         for j in range(t0 - 1, max(t0 - 1 - OB_LOOKBACK, -1), -1):
             if bar_ok[j] and c[j] > o[j]:
@@ -321,7 +386,7 @@ def compute_patterns(
 
 
 def _fold_meta(fold: str) -> dict:
-    d = REPO_ROOT / FOLDS[fold]
+    d = EVAL_ROOT / FOLDS[fold]
     m = json.loads((d / "metrics.json").read_text(encoding="utf-8"))
     return {
         "eval_dir": FOLDS[fold],
@@ -333,7 +398,7 @@ def _fold_meta(fold: str) -> dict:
 
 
 def _load_fold_keys(fold: str) -> pd.DataFrame:
-    d = REPO_ROOT / FOLDS[fold]
+    d = EVAL_ROOT / FOLDS[fold]
     lb = pd.read_parquet(d / "labels.parquet",
                          columns=["PERMNO", "signal_date", "status", "label"])
     sc = pd.read_parquet(d / "scores.parquet",
@@ -354,7 +419,7 @@ def stage1_patterns(block: str, out_dir: Path, force: bool) -> Path:
 
     permnos: set[int] = set()
     for fold in cfg["folds"]:
-        d = REPO_ROOT / FOLDS[fold]
+        d = EVAL_ROOT / FOLDS[fold]
         permnos |= set(pd.read_parquet(d / "labels.parquet",
                                        columns=["PERMNO"])["PERMNO"].unique().tolist())
     permnos_arr = np.array(sorted(permnos), dtype=np.int64)
@@ -389,9 +454,10 @@ def stage1_patterns(block: str, out_dir: Path, force: bool) -> Path:
 
     groups = px.groupby("PERMNO", sort=False).indices
     for i, (pn, idx) in enumerate(groups.items()):
-        res = compute_patterns(o[idx], h[idx], lo[idx], c[idx])
+        res = compute_patterns(o[idx], h[idx], lo[idx], c[idx], skip_p5p6=SKIP_P5P6)
         for k, v in res.items():
-            cols[k][idx] = v
+            if k in cols:          # 只落要跑的标记 + computable（注入后可能是子集）
+                cols[k][idx] = v
         if (i + 1) % 500 == 0:
             log(f"  ... {i+1}/{len(groups)} PERMNO")
 
@@ -568,7 +634,9 @@ def stage3_stats(out_dir: Path) -> dict:
                    "nw_lag": NW_LAG, "sesoi_bp": SESOI_BP, "mde_mult": MDE_MULT,
                    "t_gate": T_GATE, "t_bonf": T_BONF,
                    "consistency_frac": CONSISTENCY_FRAC, "quintile": QUINTILE,
-                   "min_hist_p5p6": MIN_HIST_P5P6},
+                   "min_hist_p5p6": MIN_HIST_P5P6,
+                   "markers": list(MARKER_COLS), "questions": list(QUESTIONS),
+                   "eval_root": str(EVAL_ROOT), "skip_p5p6": bool(SKIP_P5P6)},
         "folds": {f: _fold_meta(f) for f in FOLDS},
         "blocks": {}, "q0": {}, "summaries": [],
     }
@@ -611,36 +679,41 @@ def stage3_stats(out_dir: Path) -> dict:
             for col in MARKER_COLS:
                 fv = m[col].to_numpy()
                 # ---------- Q1
-                rows = []
-                for day, idx in day_idx.items():
-                    k = idx[fv[idx]]
-                    if len(k) < MIN_DAY_TRIG:
-                        continue
-                    rows.append((day, folds_arr[idx[0]], float(yv[k].mean()), len(k)))
-                dd = pd.DataFrame(rows, columns=["signal_date", "fold", "stat", "n_evt"])
-                results["summaries"].append(_summarize(dd, col, "Q1", ycol, block))
-                dd2 = dd.assign(marker=col, question="Q1", y=ycol, block=block)
-                daily_rows.append(dd2)
+                if "Q1" in QUESTIONS:
+                    rows = []
+                    for day, idx in day_idx.items():
+                        k = idx[fv[idx]]
+                        if len(k) < MIN_DAY_TRIG:
+                            continue
+                        rows.append((day, folds_arr[idx[0]], float(yv[k].mean()), len(k)))
+                    dd = pd.DataFrame(rows, columns=["signal_date", "fold", "stat", "n_evt"])
+                    results["summaries"].append(_summarize(dd, col, "Q1", ycol, block))
+                    dd2 = dd.assign(marker=col, question="Q1", y=ycol, block=block)
+                    daily_rows.append(dd2)
 
                 # ---------- Q2(b) 五分位内触发 − 未触发
-                hi_side = EXPECTED_SIGN[col] > 0
-                rows = []
-                for day, idx in day_idx.items():
-                    sel = idx[(kr[idx] >= 1 - QUINTILE)] if hi_side else idx[(kr[idx] <= QUINTILE)]
-                    if len(sel) == 0:
-                        continue
-                    t_mask = fv[sel]
-                    nt = int(t_mask.sum())
-                    if nt < MIN_DAY_TRIG or nt == len(sel):
-                        continue
-                    rows.append((day, folds_arr[idx[0]],
-                                 float(yv[sel][t_mask].mean() - yv[sel][~t_mask].mean()),
-                                 nt))
-                dd = pd.DataFrame(rows, columns=["signal_date", "fold", "stat", "n_evt"])
-                results["summaries"].append(_summarize(dd, col, "Q2b", ycol, block))
-                daily_rows.append(dd.assign(marker=col, question="Q2b", y=ycol,
-                                            block=block))
+                if "Q2b" in QUESTIONS:
+                    hi_side = EXPECTED_SIGN[col] > 0
+                    rows = []
+                    for day, idx in day_idx.items():
+                        sel = (idx[(kr[idx] >= 1 - QUINTILE)] if hi_side
+                               else idx[(kr[idx] <= QUINTILE)])
+                        if len(sel) == 0:
+                            continue
+                        t_mask = fv[sel]
+                        nt = int(t_mask.sum())
+                        if nt < MIN_DAY_TRIG or nt == len(sel):
+                            continue
+                        rows.append((day, folds_arr[idx[0]],
+                                     float(yv[sel][t_mask].mean() - yv[sel][~t_mask].mean()),
+                                     nt))
+                    dd = pd.DataFrame(rows, columns=["signal_date", "fold", "stat", "n_evt"])
+                    results["summaries"].append(_summarize(dd, col, "Q2b", ycol, block))
+                    daily_rows.append(dd.assign(marker=col, question="Q2b", y=ycol,
+                                                block=block))
 
+                if "Q2a" not in QUESTIONS:
+                    continue
                 # ---------- Q2(a) Fama–MacBeth 日截面回归
                 rows_b2, rows_b3 = [], []
                 for day, idx in day_idx.items():
@@ -1095,27 +1168,68 @@ def _peak_mib() -> float:
         return float("nan")
 
 
+def run_probe(out_dir: Path, *, force: bool = False, stages: tuple[str, ...] = ("1", "2", "3"),
+              report: bool = True) -> dict | None:
+    """按当前（可能已 :func:`configure` 注入的）配置跑三个阶段。
+
+    返回 stage3 的 results 字典（若跑了阶段 3），否则 None。
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    t0 = time.time()
+    res = None
+    with FileLock(out_dir / ".lock"):
+        if "1" in stages:
+            for b in BLOCKS:
+                stage1_patterns(b, out_dir, force)
+        if "2" in stages:
+            for b in BLOCKS:
+                stage2_merge(b, out_dir, force)
+        if "3" in stages:
+            res = stage3_stats(out_dir)
+            if report:
+                write_report(res, out_dir, time.time() - t0, _peak_mib())
+    log(f"完成，总耗时 {(time.time()-t0)/60:.1f} 分钟，峰值内存 {_peak_mib():.0f} MiB")
+    return res
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="outputs/ict_pattern_probe")
     ap.add_argument("--force", action="store_true", help="重算所有阶段（默认断点续跑）")
     ap.add_argument("--stage", default="all", choices=["all", "1", "2", "3"])
+    ap.add_argument("--folds", default=None,
+                    help='JSON：{"fold05": "fold05", ...}（值相对 --eval-root）；'
+                         "缺省 = 冻结的 11 个已消耗开发折")
+    ap.add_argument("--eval-root", default=None,
+                    help="FOLDS 的值相对它解析；缺省 = 仓库根")
+    ap.add_argument("--blocks", default=None,
+                    help='JSON：{"late": {"folds": [...], "panel_lo": "...", '
+                         '"panel_hi": "...", "label": "..."}}')
+    ap.add_argument("--markers", default=None,
+                    help="逗号分隔，如 P1_bull,P1_bear；缺省 = 全部 12 个")
+    ap.add_argument("--questions", default=None,
+                    help="逗号分隔，取自 Q1,Q2b,Q2a；缺省 = 三个都算")
+    ap.add_argument("--panel", default=None, help="复权 OHLC 面板 parquet")
+    ap.add_argument("--universe", default=None, help="universe parquet")
     args = ap.parse_args()
 
+    def _load(spec):
+        p = Path(spec)
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else json.loads(spec)
+
+    configure(
+        folds=None if args.folds is None else _load(args.folds),
+        blocks=None if args.blocks is None else _load(args.blocks),
+        markers=None if args.markers is None else tuple(args.markers.split(",")),
+        questions=None if args.questions is None else tuple(args.questions.split(",")),
+        eval_root=None if args.eval_root is None else Path(args.eval_root),
+        panel=None if args.panel is None else Path(args.panel),
+        universe=None if args.universe is None else Path(args.universe),
+    )
     out_dir = (REPO_ROOT / args.out) if not Path(args.out).is_absolute() else Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    t0 = time.time()
-    with FileLock(out_dir / ".lock"):
-        if args.stage in ("all", "1"):
-            for b in BLOCKS:
-                stage1_patterns(b, out_dir, args.force)
-        if args.stage in ("all", "2"):
-            for b in BLOCKS:
-                stage2_merge(b, out_dir, args.force)
-        if args.stage in ("all", "3"):
-            res = stage3_stats(out_dir)
-            write_report(res, out_dir, time.time() - t0, _peak_mib())
-    log(f"完成，总耗时 {(time.time()-t0)/60:.1f} 分钟，峰值内存 {_peak_mib():.0f} MiB")
+    stages = ("1", "2", "3") if args.stage == "all" else (args.stage,)
+    run_probe(out_dir, force=args.force, stages=stages)
 
 
 if __name__ == "__main__":

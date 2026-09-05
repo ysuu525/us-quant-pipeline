@@ -37,6 +37,20 @@ K6b 三层限定（本实验完整继承）
 本次均不构造、不用代理替代。所有价量特征只用信号日收盘及以前的信息；收益侧
 只由 K6b 的冻结管道在 t+1 及以后作为结果使用。大面板按不超过两个日历年的块
 读取，严格列裁剪并在 parquet 层日期下推；绝不读取未开放折。
+
+折 / 窗口 / 分数来源的注入（2026-09-05 新增，**默认行为逐位不变**）
+------------------------------------------------------------------
+`run()` 与 CLI 新增 `folds` / `fold_windows` / `blocks` / `scores_root` 四个可选注入点，
+默认全部取本文件顶部的冻结常量（折 36–42 与其四个块），因此**不传参时与既往一致**。
+注入的用途只有一个：确认协议 v4 的 H1b（扩充控制集张成）在折 05–35 上跑同一套
+冻结规格。那条路径由**确认集解封读取的唯一入口脚本**驱动（本脚本不引用它、也不知道封存目录的命名）——
+
+* 折窗口由 `crsp_pipeline.splits.walk_forward_folds` **机械生成**，不得手写；
+* 分数从解封入口写出的**未封存输出树**（`<out>/ft/fold<NN>/scores.parquet`）取，
+  本脚本因此不知道、也不得知道封存目录的命名；
+* 判据与 K6b 原样（保留率 ≥75%、逐折固定载荷残差 alpha > 0 ≥ 5/7），
+  **不得因为换了折就调门槛**；口径沿 K6b 的 NT=6，**与 NT=5 读数不并列比较**
+  （`CLAUDE.md` §八）。
 """
 from __future__ import annotations
 
@@ -220,12 +234,18 @@ def hi52_history(adjusted: pd.DataFrame) -> pd.DataFrame:
     return ordered[["PERMNO", "DlyCalDt", "hi52"]]
 
 
-def build_block_factors(raw: pd.DataFrame, adjusted: pd.DataFrame, processed: Path) -> pd.DataFrame:
+def build_block_factors(raw: pd.DataFrame, adjusted: pd.DataFrame, processed: Path,
+                        *, allow_alt_processed: bool = False) -> pd.DataFrame:
     """复用 K6b 的 CORE 构造，并只增加冻结的历史量。"""
     assert_readable(processed / "market_index.parquet")
     # K6b.build_factors 从自身冻结 P 读取市场指数；默认运行要求同一 processed 快照。
     if processed.resolve() != Path(K6B.P).resolve():
-        raise ValueError(f"processed 必须与 K6b 冻结快照一致：{K6B.P}")
+        if not allow_alt_processed:
+            raise ValueError(f"processed 必须与 K6b 冻结快照一致：{K6B.P}")
+        # 只给合成数据冒烟用：把 K6b 的快照常量指到同一个替代目录，
+        # 真数据运行不会走到这里（allow_alt_processed 默认 False）。
+        log(f"[exp11] 合成/替代快照模式：K6B.P {K6B.P} -> {processed}")
+        K6B.P = processed
     turnover = turnover_history(raw)
     hi52 = hi52_history(adjusted)
     base = K6B.build_factors(raw)
@@ -334,13 +354,20 @@ def _panel_maps(factors: pd.DataFrame) -> tuple[dict, dict, dict]:
 
 
 def _fold_candidate(
-    fold: int, factors: pd.DataFrame, sic_history: pd.DataFrame, outputs_root: Path
+    fold: int, factors: pd.DataFrame, sic_history: pd.DataFrame, outputs_root: Path,
+    *, fold_windows: dict[int, tuple[str, str]] | None = None,
+    scores_root: Path | None = None,
 ) -> tuple[pd.DataFrame, dict]:
-    path = scores_path(fold, "ft", root=outputs_root)
+    windows = FOLD_WINDOWS if fold_windows is None else fold_windows
+    if scores_root is None:
+        path = scores_path(fold, "ft", root=outputs_root)
+    else:
+        # 注入路径：解封入口写出的未封存输出树，本脚本不知道封存目录的命名。
+        path = Path(scores_root) / f"fold{fold:02d}" / "scores.parquet"
     assert_readable(path)
     scores = pd.read_parquet(path, columns=["PERMNO", "signal_date", "score"]).dropna()
     scores["signal_date"] = pd.to_datetime(scores["signal_date"])
-    lo, hi = map(pd.Timestamp, FOLD_WINDOWS[fold])
+    lo, hi = map(pd.Timestamp, windows[fold])
     if scores["signal_date"].min() < lo or scores["signal_date"].max() > hi:
         raise ValueError(f"fold{fold} scores 日期越过冻结窗口 {lo.date()}..{hi.date()}")
     if scores.duplicated(["PERMNO", "signal_date"]).any():
@@ -361,9 +388,14 @@ def collect_fold_daily(
     factors: pd.DataFrame,
     sic_history: pd.DataFrame,
     outputs_root: Path,
+    *,
+    fold_windows: dict[int, tuple[str, str]] | None = None,
+    scores_root: Path | None = None,
 ) -> dict[str, dict[str, Any]]:
     """复用 K6b.run_pipeline；所有规格参数只来自本文件的冻结常量。"""
-    candidate, raw_scores = _fold_candidate(fold, factors, sic_history, outputs_root)
+    candidate, raw_scores = _fold_candidate(
+        fold, factors, sic_history, outputs_root,
+        fold_windows=fold_windows, scores_root=scores_root)
     days = sorted(raw_scores)
     # K6b 的管道只会索引 signal days（及 `days[i+1]`，仍在同一集合）；
     # 先裁到本折日期再建 Python 字典，避免把整个两年块复制成三套巨型映射。
@@ -409,6 +441,8 @@ def mechanical_readout(
     strategy: pd.DataFrame,
     controls: pd.DataFrame,
     market: pd.Series,
+    *,
+    folds: Iterable[int] | None = None,
 ) -> dict[str, Any]:
     regressors = pd.concat([controls, market], axis=1, sort=True)
     data = pd.concat([strategy["long"].rename("y"), regressors], axis=1, sort=True).dropna()
@@ -424,7 +458,7 @@ def mechanical_readout(
     residual = y - matrix.to_numpy(dtype=np.float64) @ beta[1:]
     residual_series = pd.Series(residual, index=data.index)
     per_fold: dict[str, float] = {}
-    for fold in (f"fold{number}" for number in FOLDS):
+    for fold in (f"fold{number}" for number in (FOLDS if folds is None else folds)):
         dates = strategy.index[strategy["fold"] == fold]
         selected = residual_series.loc[residual_series.index.isin(dates)]
         if len(selected) < 40:
@@ -468,24 +502,37 @@ def mechanical_readout(
     }
 
 
-def run(processed: Path, jkp_root: Path, outputs_root: Path) -> dict[str, Any]:
-    start_committed = enforce_memory_gate()
+def run(processed: Path, jkp_root: Path, outputs_root: Path, *,
+        folds: Iterable[int] | None = None,
+        fold_windows: dict[int, tuple[str, str]] | None = None,
+        blocks: Iterable[dict[str, Any]] | None = None,
+        scores_root: Path | None = None,
+        memory_limit_gb: float = MEMORY_LIMIT_GB,
+        allow_alt_processed: bool = False) -> dict[str, Any]:
+    """注入点全部可选；不传即用本文件顶部的冻结常量（折 36–42 + 四个块）。"""
+    use_folds = tuple(FOLDS if folds is None else folds)
+    use_blocks = tuple(BLOCKS if blocks is None else blocks)
+    use_windows = FOLD_WINDOWS if fold_windows is None else fold_windows
+    start_committed = enforce_memory_gate(memory_limit_gb)
     sic_history = load_sic_history(processed)
     collected = {
         spec: {"strategy": [], "controls": {column: [] for column in columns}}
         for spec, columns in SPEC_COLUMNS.items()
     }
     block_meta = []
-    for block in BLOCKS:
-        before = enforce_memory_gate()
+    for block in use_blocks:
+        before = enforce_memory_gate(memory_limit_gb)
         lo, hi = block["lo"], block["hi"]
         log(f"读取块 {lo}..{hi}；committed={before:.2f} GB")
         raw = load_raw_block(processed, lo, hi)
         adjusted = load_adjusted_block(processed, lo, hi)
-        factors = build_block_factors(raw, adjusted, processed)
+        factors = build_block_factors(raw, adjusted, processed,
+                                      allow_alt_processed=allow_alt_processed)
         del raw, adjusted
         for fold in block["folds"]:
-            fold_daily = collect_fold_daily(fold, factors, sic_history, outputs_root)
+            fold_daily = collect_fold_daily(
+                fold, factors, sic_history, outputs_root,
+                fold_windows=use_windows, scores_root=scores_root)
             for spec, payload in fold_daily.items():
                 collected[spec]["strategy"].append(payload["strategy"])
                 for column, series in payload["controls"].items():
@@ -504,14 +551,16 @@ def run(processed: Path, jkp_root: Path, outputs_root: Path) -> dict[str, Any]:
             [pd.concat(payload["controls"][column]).sort_index() for column in SPEC_COLUMNS[spec]],
             axis=1,
         )
-        results[spec] = mechanical_readout(spec, strategy, controls, market)
+        results[spec] = mechanical_readout(spec, strategy, controls, market,
+                                           folds=use_folds)
     return {
         "meta": {
             "run_utc": datetime.now(timezone.utc).isoformat(),
-            "folds": list(FOLDS),
+            "folds": list(use_folds),
             "blocks": block_meta,
+            "scores_root": (None if scores_root is None else str(scores_root)),
             "starting_committed_memory_gb": start_committed,
-            "memory_limit_gb": MEMORY_LIMIT_GB,
+            "memory_limit_gb": memory_limit_gb,
             "k6b_reused": ["CORE", "build_factors", "run_pipeline", "nw_ols"],
             "k6b_frozen_construction": {
                 "nt": K6B.NT,
@@ -540,6 +589,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--jkp", type=Path, default=JKP)
     parser.add_argument("--outputs-root", type=Path, default=OUTPUTS)
     parser.add_argument("--out", type=Path, default=OUT_JSON)
+    parser.add_argument("--folds", default=None,
+                        help="折号列表，如 5,6,7 或 5-35；缺省 = 冻结的 36–42")
+    parser.add_argument("--fold-windows", type=Path, default=None,
+                        help='JSON：{"5": ["2005-01-03","2005-07-01"], ...}；'
+                             "须由 scripts/emit_folds.py 机械产出，不得手写")
+    parser.add_argument("--blocks", type=Path, default=None,
+                        help='JSON：[{"lo":"2004-01-01","hi":"2005-12-30","folds":[5,6]}, ...]')
+    parser.add_argument("--scores-root", type=Path, default=None,
+                        help="含 fold<NN>/scores.parquet 的未封存输出树；"
+                             "缺省走 signals.kronos_adapter 的开发折路径")
+    parser.add_argument("--memory-limit-gb", type=float, default=MEMORY_LIMIT_GB)
+    parser.add_argument("--allow-alt-processed", action="store_true",
+                        help="仅合成数据冒烟：允许 processed 与 K6b 冻结快照不同")
     return parser.parse_args()
 
 
@@ -557,10 +619,37 @@ def print_table(report: dict[str, Any]) -> None:
     print("缺口：财报日虚拟需外部日历；SUE 需 Compustat；本次均未构造。")
 
 
+def _parse_fold_spec(spec: str) -> tuple[int, ...]:
+    got: set[int] = set()
+    for part in str(spec).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            got.update(range(int(lo), int(hi) + 1))
+        else:
+            got.add(int(part))
+    return tuple(sorted(got))
+
+
 def main() -> int:
     args = parse_args()
+    folds = None if args.folds is None else _parse_fold_spec(args.folds)
+    windows = None
+    if args.fold_windows is not None:
+        windows = {int(k): tuple(v) for k, v in
+                   json.loads(args.fold_windows.read_text(encoding="utf-8")).items()}
+    blocks = None
+    if args.blocks is not None:
+        blocks = json.loads(args.blocks.read_text(encoding="utf-8"))
     try:
-        report = run(args.processed.resolve(), args.jkp.resolve(), args.outputs_root.resolve())
+        report = run(args.processed.resolve(), args.jkp.resolve(), args.outputs_root.resolve(),
+                     folds=folds, fold_windows=windows, blocks=blocks,
+                     scores_root=(None if args.scores_root is None
+                                  else args.scores_root.resolve()),
+                     memory_limit_gb=args.memory_limit_gb,
+                     allow_alt_processed=args.allow_alt_processed)
     except MemoryGateError as exc:
         print(f"[exp11] WAIT: {exc}", file=sys.stderr)
         return 3
