@@ -23,6 +23,7 @@
 
 > **入口页**：本轮收口计划（用户 09-05 采纳 Codex 审计《研究诊断与收口建议_2026-09-05》）的第一步交付是
 > `docs/当前有效设计_一页清单_2026-09-05.md`（quant-3f，commit `ddc2c79`）——**新会话先读它，再读本节**。
+> **09-06 凌晨：确认集已读取（一页清单第二步完成）。** 用户书面授权 `ledger:689`；主段 `outputs/unseal_20260905T151817Z`（折 05–35，FT，存档 `docs/unseal_readout_20260905T151817Z/`），干净窗补跑 `outputs/unseal_20260905T160632Z_cleanwin`（fold44–45，`--clean-window-only --no-h3`，存档 `docs/unseal_readout_20260905T160632Z_cleanwin/`）。释放清单读数见登记簿两条 `confirmation-readout` 行；一句话：折 05–35 全池 IC +0.00627 [+0.00104, +0.01151]、19/31，主预测区间边缘相交；ΔADV 三门全过；H3 树基线 +0.01451 反超 Kronos（ΔIC CI 盖零，B 层）；E 毛年化 +1.15%、BE 2.14bp；干净窗一年全部区间盖零。**折 05–35 与 fold44–45 自此永久视为已消耗。** 第三步结果报告初稿由 opus 起草中（任务书 `docs/结果报告_任务书_2026-09-06.md`）。第二章 b 的 `.ots` 仍待比特币入块后 `ots upgrade`。
 > **09-05 深夜增补**（本节正文写于当日傍晚，以下为其后发生的事，登记簿为准）：
 > ① `experiments/confirmation_protocol_v4.1_addendum_2026-09-05.md`：用户裁定**抛弃 ZS 臂**（冻结后、读取前的设计变更；z 维持 2.2414；H3 主口径改 XGBoost×FT；ZS 封存分数不删不读）；§5 两张折表并存披露，**读取时剔除封存 fold35 的 2020-07-01 / 07-02 两个信号日**。
 > ② R-build 已完成并提交（`65d15e0`、`2276766`）：唯一入口 `scripts/unseal_read_confirm.py`，默认 `--arms ft`，`--authorised-by-user ledger:<行号>` 硬闸门，H3 配对与 fold35 剔除已实现，173/188 项测试通过，合成 smoke 1.4 分钟。
