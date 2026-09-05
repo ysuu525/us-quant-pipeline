@@ -1,0 +1,186 @@
+{
+  "schema_version": 2,
+  "experiment_id": "gbdt_strong_jkp_v2",
+  "as_of_date": "2026-08-31",
+  "sealed_raw_data_cutoff": "2023-12-29",
+  "revision_from_v1": "Before any outer result was viewed, replace the full JKP CSV scan with a physically cutoff state snapshot and fail-closed artifact provenance.",
+  "frozen_label_artifact_exception": {
+    "enabled": true,
+    "reason": "The mandated fold42 official labels are pre-existing frozen artifacts whose t+6 exits extend to 2024-01-09. Reuse them for an apples-to-apples comparison, but do not read new CRSP or JKP rows after 2023-12-29."
+  },
+  "models": [
+    "lightgbm",
+    "xgboost",
+    "catboost"
+  ],
+  "package_versions": {
+    "lightgbm": "4.7.0",
+    "xgboost": "3.4.1",
+    "catboost": "1.2.10",
+    "pandas": "3.0.5",
+    "numpy": "2.5.2"
+  },
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "tuning_seed": 20260831,
+  "num_threads": 6,
+  "max_rss_gb": 8.0,
+  "features": {
+    "stock_features": "the existing 26 price/volume features, built before the point-in-time universe filter and then ranked cross-sectionally by date",
+    "price_source": "panel_kronos_adj.parquet; DlyRet and DlyCap come from panel_raw.parquet",
+    "jkp_state_snapshot": "F:/quant/external/jkp/derived/usa_all_factors_daily_vw_cap_state_lag1_5_20_60_2001-10-01_through_2023-12-29.parquet",
+    "jkp_state_snapshot_sha256": "669a1e2381cf3889b263c4c70374fefed22d8e451a56204b594b8696f709d944",
+    "jkp_series": 153,
+    "jkp_windows": [
+      5,
+      20,
+      60
+    ],
+    "jkp_lag_observations": 1,
+    "jkp_formula": "expm1(rolling_sum(log1p(ret.shift(1))))",
+    "jkp_cross_sectional_rank": false,
+    "jkp_fill": "none"
+  },
+  "training_label": {
+    "kind": "six-market-session compounded CRSP DlyRet, cross-sectionally demeaned",
+    "horizon": 6,
+    "construction_order": "build on the unfiltered stock history, require exact consecutive market-session positions, then apply the universe anchor filter",
+    "purge": "require label_end_date strictly before each inner or outer validation start"
+  },
+  "inner_validation": {
+    "tail_trading_days": 126,
+    "tune_max_stocks_per_day": 384,
+    "selection_metric": "mean daily cross-sectional RankIC",
+    "selection_scope": "independent within each outer fold",
+    "tie_break": "fewer boosting rounds, then lower structural complexity"
+  },
+  "round_checkpoints": [
+    300,
+    700
+  ],
+  "grids": {
+    "lightgbm": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "num_leaves": [
+        31,
+        127
+      ],
+      "min_data_in_leaf": [
+        250,
+        1000
+      ]
+    },
+    "xgboost": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "max_depth": [
+        4,
+        8
+      ],
+      "min_child_weight": [
+        50,
+        250
+      ]
+    },
+    "catboost": {
+      "learning_rate": [
+        0.02,
+        0.05
+      ],
+      "depth": [
+        6,
+        8
+      ],
+      "l2_leaf_reg": [
+        3.0,
+        10.0
+      ]
+    }
+  },
+  "final_fit": {
+    "hyperparameters": "one inner-selected configuration per model and outer fold, fixed across all final seeds",
+    "primary_prediction": "arithmetic mean of the three seed predictions for each stock-date key",
+    "seed_dispersion": "standard deviation of the three seed-level 881-day mean RankIC values"
+  },
+  "evaluation": {
+    "folds": [
+      "fold36",
+      "fold37",
+      "fold38",
+      "fold39",
+      "fold40",
+      "fold41",
+      "fold42"
+    ],
+    "expected_daily_ic_count": 881,
+    "labels": "outputs/foldNN_lb90_s0_poolB_universe/eval_amp_lb90_foldNN/labels.parquet",
+    "primary_metric": "mean of all 881 concatenated daily RankIC values, matching the exact +0.020667959 Kronos reference",
+    "secondary_metrics": [
+      "Newey-West t-statistic with lag 5",
+      "simple equal-weight mean of seven fold RankIC values",
+      "number of positive folds",
+      "per-seed primary-metric mean and standard deviation"
+    ],
+    "kronos_reference_rank_ic": 0.020667959127347774,
+    "kronos_equal_weight_seven_fold_rank_ic": 0.020714629843068117,
+    "decision_thresholds": [
+      {
+        "upper_exclusive": 0.01,
+        "conclusion": "Kronos clearly wins"
+      },
+      {
+        "lower_inclusive": 0.01,
+        "upper_inclusive": 0.02,
+        "conclusion": "Kronos leads, but not decisively"
+      },
+      {
+        "lower_exclusive": 0.02,
+        "conclusion": "The tree model matches or beats Kronos"
+      }
+    ]
+  },
+  "compute": {
+    "device": "CPU only",
+    "min_available_ram_gb_before_fold": 10.0,
+    "materialization": "date-filtered base cache plus one fold at a time; JKP state columns are expanded into the dense matrix in row chunks",
+    "resume": "fail closed unless config, pipeline build, cache, package versions, hyperparameters, model, fold, and seed fingerprints all match"
+  },
+  "sealed_extension_2026_09_05": {
+    "authorisation": "experiments/ledger.md 2026-09-05 authorisation-and-sealed-mode (H3 disposal option one): a single compute-only training and scoring pass of the tree baseline on folds 05-35, sealed mode, no metric of any kind.",
+    "what_changed": [
+      "features.jkp_state_snapshot / _sha256: the derived JKP state table is rebuilt with the identical formula expm1(rolling_sum(log1p(ret.shift(1)))), the identical windows 5/20/60 and the identical lag of one observation, over the wider physical window 2001-10-01..2023-12-29 instead of 2017-01-03..2023-12-29."
+    ],
+    "what_did_not_change": [
+      "grids",
+      "seeds",
+      "tuning_seed",
+      "round_checkpoints",
+      "inner_validation",
+      "final_fit",
+      "training_label",
+      "num_threads",
+      "max_rss_gb",
+      "compute",
+      "sealed_raw_data_cutoff",
+      "stock feature definitions"
+    ],
+    "snapshot_fidelity": "scripts/build_jkp_state_snapshot.py rebuilt the reference snapshot on its own physical window 2017-01-03..2023-12-29 and reproduced it bit for bit (max absolute difference 0.0 across 459 columns x 1760 rows, identical NaN pattern). Against the widened snapshot the shared range agrees to 1.11e-16, below the 1e-12 tolerance; the only structural difference is the reference's own rolling warm-up through 2017-03-29, which a longer history fills in and which no fold ever consumed.",
+    "models_run": [
+      "xgboost"
+    ],
+    "models_not_run": [
+      "lightgbm",
+      "catboost"
+    ],
+    "folds": "fold05..fold35, emitted mechanically by scripts/emit_folds.py",
+    "evaluation_block_is_inert": "the evaluation block below still describes the seven development folds; compute-only mode never reaches summarize() and never loads a label."
+  }
+}

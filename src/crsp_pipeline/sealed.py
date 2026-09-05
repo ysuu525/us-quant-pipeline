@@ -77,10 +77,13 @@ def write_seal(out_dir: Path, manifest: dict) -> None:
                 f"封存失败：{out_dir / bad} 不应存在。封存模式绝不产出该文件。")
     manifest = dict(manifest)
     manifest["sealed_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    manifest["authorisation"] = (
+    # 调用方可以带上自己那次授权的原文（如树基线的 2026-09-05 计算专用授权）；
+    # 不带时沿用 Kronos 队列的 2026-09-02 口径。
+    manifest.setdefault(
+        "authorisation",
         "2026-09-02 用户授权：仅允许 FT 固定配置训练与 FT/ZS 打分；"
         "不得生成/读取 labels，不得计算任何 IC/收益/分层/年度/组合指标，"
-        "不得人工打开 scores。计算不视为消耗确认集；读取须另行授权。"
+        "不得人工打开 scores。计算不视为消耗确认集；读取须另行授权。",
     )
     (out_dir / MANIFEST).write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, default=str),
@@ -93,11 +96,16 @@ def write_seal(out_dir: Path, manifest: dict) -> None:
         encoding="utf-8")
 
 
-def audit_dir(out_dir: Path) -> dict:
-    """列目录并断言只有允许的文件。冒烟与自动测试用。"""
+def audit_dir(out_dir: Path, extra_allowed: set[str] | None = None) -> dict:
+    """列目录并断言只有允许的文件。冒烟与自动测试用。
+
+    ``extra_allowed`` 供别的封存生产者（如树基线：三个 seed 分数文件与内层
+    选参记录）声明它自己的白名单；不传时行为与旧版逐字节一致。
+    """
     out_dir = Path(out_dir)
     names = {p.name for p in out_dir.iterdir()}
-    extra = names - ALLOWED_FILES
+    allowed = ALLOWED_FILES | set(extra_allowed or ())
+    extra = names - allowed
     missing = {SENTINEL, MANIFEST, "scores.parquet"} - names
     forbidden = names & set(FORBIDDEN_FILES)
     return {"dir": str(out_dir), "files": sorted(names),

@@ -4,6 +4,24 @@ The frozen experiment lives in ``configs/gbdt_strong_v1.json``.  This pipeline
 builds stock features before applying the point-in-time universe filter, tunes
 inside each outer training window, and evaluates on the same frozen official
 labels as Kronos.  All artifacts are resumable.
+
+Compute-only mode (``--sealed``)
+-------------------------------
+The 2026-09-05 authorisation extends the 2026-09-01 compute-only grant to the
+tree baseline on the untouched folds: train the frozen XGBoost recipe and emit
+scores, **compute no metric of any kind**.  In that mode this script
+
+* takes its fold table from ``--folds-json`` (mechanically produced by
+  ``scripts/emit_folds.py``; the seven development folds stay the default),
+* never loads ``labels.parquet`` and never calls the daily-IC path,
+* keeps its per-year feature cache — which carries the training target column
+  ``y`` — inside a directory that itself carries the ``SEALED`` sentinel,
+* writes each fold's scores plus sentinel and manifest through
+  ``crsp_pipeline.sealed.write_seal`` and checks the directory with
+  ``audit_dir``.
+
+The hyperparameter grid, the seeds, the inner selection rule and the round
+checkpoints are untouched; only the window and the JKP snapshot are widened.
 """
 from __future__ import annotations
 
@@ -19,6 +37,8 @@ import json
 import math
 import os
 import shutil
+import sys
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -29,6 +49,29 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_sealed_module() -> Any:
+    """Load ``crsp_pipeline/sealed.py`` by path.
+
+    ``.venv-gbdt`` deliberately holds only the tree stack, so importing the
+    ``crsp_pipeline`` package (which pulls in yaml and friends) is not an option
+    here.  ``sealed.py`` itself is pure standard library.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "crsp_pipeline_sealed_direct", ROOT / "src" / "crsp_pipeline" / "sealed.py"
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot locate src/crsp_pipeline/sealed.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_SEALED = _load_sealed_module()
+audit_dir = _SEALED.audit_dir
+write_seal = _SEALED.write_seal
 PROCESSED = Path(r"F:\quant\processed\crsp_ciz_2026-08-24_20260825T130601Z")
 DEFAULT_CONFIG = ROOT / "configs" / "gbdt_strong_v2.json"
 DEFAULT_OUT = ROOT / "outputs" / "gbdt_strong_jkp_v2"
@@ -57,6 +100,44 @@ FOLDS = (
     Fold("fold41", "2020-01-02", "2022-12-21", "2023-01-03", "2023-06-30"),
     Fold("fold42", "2020-07-01", "2023-06-22", "2023-07-03", "2023-12-29"),
 )
+
+# The active table defaults to the seven frozen development folds and is only
+# replaced by ``--folds-json``, whose contents must come from
+# ``scripts/emit_folds.py`` (hand-written windows are forbidden).
+ACTIVE_FOLDS: tuple[Fold, ...] = FOLDS
+
+SEALED_DIR_NAME = "sealed"
+SEALED_LOG_NAME = "sealed_run.log"
+# The frozen per-fold artifacts a compute-only run is allowed to leave behind on
+# top of what ``crsp_pipeline.sealed`` already permits.  ``tuning.json`` records
+# the inner selection; because its inner-split RankIC values fall inside the
+# untouched range for the later folds it stays under the sentinel and is never
+# printed.
+SEALED_EXTRA_BASE = {"tuning.json"}
+
+
+def _sealed_allowed(seeds: Iterable[int]) -> set[str]:
+    return SEALED_EXTRA_BASE | {
+        f"scores_seed{int(seed)}.{suffix}"
+        for seed in seeds
+        for suffix in ("parquet", "json")
+    }
+
+
+def _load_folds_json(path: Path) -> tuple[Fold, ...]:
+    """Fold windows emitted by ``scripts/emit_folds.py`` — never hand-written."""
+    # utf-8-sig: PowerShell's Set-Content -Encoding utf8 leaves a BOM on new files
+    records = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    folds = tuple(
+        Fold(str(item["n"]), str(item["ts"]), str(item["te"]), str(item["vs"]), str(item["ve"]))
+        for item in records
+    )
+    if not folds:
+        raise ValueError(f"Empty fold table: {path}")
+    names = [fold.name for fold in folds]
+    if len(set(names)) != len(names):
+        raise ValueError(f"Duplicate fold names in {path}")
+    return folds
 
 STOCK_FEATURES = (
     *(f"ret{w}" for w in (1, 2, 3, 5, 10, 20, 60)),
@@ -172,8 +253,8 @@ def _check_runtime_versions(config: dict[str, Any]) -> None:
         raise RuntimeError(f"Frozen package versions differ: expected={expected}, actual={actual}")
 
 
-def _freeze_preregister(config_path: Path, out_dir: Path) -> None:
-    target = out_dir / "preregister.json"
+def _freeze_preregister(config_path: Path, out_dir: Path, name: str = "preregister.json") -> None:
+    target = out_dir / name
     source = config_path.read_bytes()
     if target.exists() and target.read_bytes() != source:
         raise RuntimeError(f"Frozen preregistration differs from {config_path}: {target}")
@@ -295,9 +376,13 @@ def _prepare_base_cache(cache_dir: Path, config: dict[str, Any], config_sha: str
     base_dir = cache_dir / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = base_dir / "manifest.json"
-    first_signal = pd.Timestamp(min(f.train_start for f in FOLDS))
+    first_signal = pd.Timestamp(min(f.train_start for f in ACTIVE_FOLDS))
     cutoff = pd.Timestamp(config["sealed_raw_data_cutoff"])
-    years = list(range(first_signal.year, cutoff.year + 1))
+    # Never build years no active fold can reach.  For the seven development
+    # folds the last validation date is the cutoff itself, so this is a no-op
+    # there; for an earlier fold table it avoids touching later raw data.
+    last_needed = min(cutoff, pd.Timestamp(max(f.val_end for f in ACTIVE_FOLDS)))
+    years = list(range(first_signal.year, last_needed.year + 1))
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         expected_header = {
@@ -330,7 +415,7 @@ def _prepare_base_cache(cache_dir: Path, config: dict[str, Any], config_sha: str
     for year in years:
         path = base_dir / f"stock_features_{year}.parquet"
         target_lo = max(first_signal, pd.Timestamp(f"{year}-01-01"))
-        target_hi = min(cutoff, pd.Timestamp(f"{year}-12-31"))
+        target_hi = min(last_needed, pd.Timestamp(f"{year}-12-31"))
         print(f"[prepare] stock features {year}: {target_lo.date()}..{target_hi.date()}", flush=True)
         frame = _build_base_year(year, target_lo, target_hi)
         tmp = path.with_suffix(".parquet.tmp")
@@ -388,7 +473,7 @@ def _prepare_jkp_cache(cache_dir: Path, config: dict[str, Any], config_sha: str)
     expected_features = int(spec["jkp_series"]) * len(spec["jkp_windows"])
     if state.shape[1] - 1 != expected_features:
         raise AssertionError(f"Expected {expected_features} JKP state columns, got {state.shape[1] - 1}")
-    required_state = state[state["date"] >= pd.Timestamp(min(f.train_start for f in FOLDS))]
+    required_state = state[state["date"] >= pd.Timestamp(min(f.train_start for f in ACTIVE_FOLDS))]
     if state["date"].duplicated().any() or not np.isfinite(
         required_state.drop(columns="date").to_numpy()
     ).all():
@@ -818,7 +903,7 @@ def _check_packages(models: Iterable[str]) -> None:
 
 
 def _smoke(cache_dir: Path, config: dict[str, Any]) -> None:
-    fold = FOLDS[0]
+    fold = ACTIVE_FOLDS[0]
     base = _load_base(cache_dir, fold.train_start, fold.train_end)
     inner_train, inner_valid, inner_start = _inner_split(base, config)
     inner_train = _systematic_sample_by_date(inner_train.tail(80_000), 64)
@@ -910,6 +995,137 @@ def _fold_result(
     )
 
 
+def _append_ledger_line(fold: Fold, model: str, model_dir: Path, seeds: list[int]) -> None:
+    """Append the one compute-only row the authorisation allows.
+
+    Append-only, no metric of any kind: tag, model, validation window, row count
+    and seeds.  The row count is read back from the manifest so this never opens
+    the score file.  Idempotent by tag, because a crash between publishing and
+    logging must not produce a second row on resume.
+    """
+    ledger = ROOT / "experiments" / "ledger.md"
+    tag = f"sealed_xgb_{fold.name}" if model == "xgboost" else f"sealed_{model}_{fold.name}"
+    if ledger.exists() and f"tag={tag} " in ledger.read_text(encoding="utf-8"):
+        return
+    manifest = json.loads((model_dir / "SEALED_MANIFEST.json").read_text(encoding="utf-8"))
+    stamp = pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds")
+    seed_text = ",".join(str(seed) for seed in seeds)
+    line = (
+        f"- {stamp} | sealed-compute | tag={tag} model={model} "
+        f"val=[{fold.val_start}..{fold.val_end}] rows={manifest['n_rows']} "
+        f"days={manifest['n_signal_dates']} seeds={seed_text} "
+        "（封存打分：未生成 labels、未计算任何指标；计算授权 != 读取授权）"
+    )
+    with open(ledger, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(line + "\n")
+
+
+def _fold_dir(out_dir: Path, model: str, fold: Fold, sealed: bool) -> Path:
+    """Compute-only runs live in their own subtree so nothing can be confused
+    with a development-fold artifact."""
+    if sealed:
+        return out_dir / model / SEALED_DIR_NAME / fold.name
+    return out_dir / model / fold.name
+
+
+def _publish_seal(
+    model_dir: Path,
+    model: str,
+    fold: Fold,
+    seeds: list[int],
+    config: dict[str, Any],
+    config_sha: str,
+    config_path: Path,
+    provenance: dict[str, Any],
+    best_params: dict[str, Any],
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    """Average the seed scores, write the sentinel + manifest, audit the directory.
+
+    Nothing here touches a label or produces a statistic: the ensemble is the
+    frozen arithmetic mean of the three seed predictions, exactly the
+    ``scores_ensemble`` recipe used on the development folds.
+    """
+    frames: list[pd.DataFrame] = []
+    for seed in seeds:
+        scores = pd.read_parquet(model_dir / f"scores_seed{seed}.parquet")
+        scores["signal_date"] = pd.to_datetime(scores["signal_date"])
+        frames.append(scores.rename(columns={"score": f"score_{seed}"}))
+    ensemble = frames[0]
+    for frame in frames[1:]:
+        ensemble = ensemble.merge(
+            frame, on=["PERMNO", "signal_date"], how="inner", validate="one_to_one"
+        )
+    if len(ensemble) != len(frames[0]):
+        raise AssertionError(f"Seed score keys disagree for {fold.name}")
+    ensemble["score"] = ensemble[[f"score_{seed}" for seed in seeds]].mean(axis=1)
+    ensemble = ensemble[["PERMNO", "signal_date", "score"]].sort_values(
+        ["signal_date", "PERMNO"], kind="stable"
+    ).reset_index(drop=True)
+    score_path = model_dir / "scores.parquet"
+    tmp = score_path.with_suffix(".parquet.tmp")
+    ensemble.to_parquet(tmp, index=False, compression="zstd")
+    tmp.replace(score_path)
+
+    manifest = {
+        "snapshot_id": str(PROCESSED.name),
+        "processed_root": str(PROCESSED),
+        "model": model,
+        "fold": fold.name,
+        "train_window": [fold.train_start, fold.train_end],
+        "val_window": [fold.val_start, fold.val_end],
+        "seeds": seeds,
+        "config_sha256": config_sha,
+        "config_path": str(config_path),
+        "code_sha256": {
+            "gbdt_baseline.py": _sha256(Path(__file__)),
+            "config": config_sha,
+        },
+        "jkp_snapshot": config["features"]["jkp_state_snapshot"],
+        "jkp_snapshot_sha256": config["features"]["jkp_state_snapshot_sha256"],
+        "scores_sha256": _sha256(score_path),
+        "seed_scores_sha256": {
+            str(seed): _sha256(model_dir / f"scores_seed{seed}.parquet") for seed in seeds
+        },
+        "best_params": best_params,
+        "provenance": provenance,
+        "n_rows": int(len(ensemble)),
+        "n_signal_dates": int(ensemble["signal_date"].nunique()),
+        "elapsed_seconds": round(float(elapsed_seconds), 1),
+        "scoring_config": {
+            "model": model,
+            "device": "CPU only",
+            "num_threads": int(config["num_threads"]),
+            "seeds": seeds,
+            "ensemble": "arithmetic mean of the three seed predictions",
+            "inner_validation": config["inner_validation"],
+            "round_checkpoints": config["round_checkpoints"],
+            "grid": config["grids"][model],
+        },
+        "authorisation": (
+            "2026-09-05 用户授权（H3 处置取第一条）：树基线在折 05–35 上做"
+            "『计算专用』的训练与打分，封存模式。只跑 XGBoost 主口径；超参网格 / "
+            "seeds / 内层选参规则一字不改，只扩窗口与 JKP 快照。训练目标标签只在"
+            "内存中消费，不得以可读形式落盘；不得计算、打印、登记任何封存窗口的 "
+            "IC / 收益 / 分层统计。计算授权 != 读取授权。"
+        ),
+        "no_metrics": (
+            "compute-only: no label was loaded for the validation window and no "
+            "IC, return or stratified statistic was computed, printed or logged"
+        ),
+        "inner_tuning_artifact": (
+            "tuning.json stays inside this directory; its inner-split RankIC "
+            "values are training-window quantities of the frozen selection rule "
+            "and are never printed or exported"
+        ),
+    }
+    write_seal(model_dir, manifest)
+    report = audit_dir(model_dir, extra_allowed=_sealed_allowed(seeds))
+    if not report["clean"]:
+        raise RuntimeError(f"Compute-only directory failed its audit: {report}")
+    return report
+
+
 def run_fold(
     fold: Fold,
     models: list[str],
@@ -917,7 +1133,11 @@ def run_fold(
     cache_dir: Path,
     config: dict[str, Any],
     config_sha: str,
+    sealed: bool = False,
+    config_path: Path = DEFAULT_CONFIG,
+    append_ledger: bool = False,
 ) -> None:
+    started = time.perf_counter()
     _check_memory(config, f"{fold.name} start", require_available=True)
     provenance = _provenance(cache_dir, config_sha)
     base = _load_base(cache_dir, fold.train_start, fold.val_end)
@@ -940,7 +1160,7 @@ def run_fold(
     tuning: dict[str, dict[str, Any]] = {}
     missing_tuning: list[str] = []
     for model in models:
-        path = out_dir / model / fold.name / "tuning.json"
+        path = _fold_dir(out_dir, model, fold, sealed) / "tuning.json"
         if path.exists():
             value = json.loads(path.read_text(encoding="utf-8"))
             _validate_tuning_artifact(
@@ -974,12 +1194,17 @@ def run_fold(
                 "n_inner_valid": int(len(inner_valid)), "trials": trials, "best": best,
             }
             _check_memory(config, f"{model} {fold.name} tuning before publish")
-            _json_dump(out_dir / model / fold.name / "tuning.json", value)
+            _json_dump(_fold_dir(out_dir, model, fold, sealed) / "tuning.json", value)
             tuning[model] = value
-            print(
-                f"[{model}] {fold.name}: best inner RankIC={best['inner_rank_ic']:+.5f} "
-                f"params={best['params']}", flush=True,
-            )
+            if sealed:
+                # The inner split of a late fold sits inside the untouched
+                # range, so its selection score is never surfaced.
+                print(f"[{model}] {fold.name}: inner selection published", flush=True)
+            else:
+                print(
+                    f"[{model}] {fold.name}: best inner RankIC={best['inner_rank_ic']:+.5f} "
+                    f"params={best['params']}", flush=True,
+                )
             _check_memory(config, f"{model} {fold.name} tuning")
         del inner_train, inner_valid, x_inner_train, x_inner_valid
         gc.collect()
@@ -988,7 +1213,7 @@ def run_fold(
     for model in models:
         best_params = tuning[model]["best"]["params"]
         for seed in seeds:
-            score_path = out_dir / model / fold.name / f"scores_seed{seed}.parquet"
+            score_path = _fold_dir(out_dir, model, fold, sealed) / f"scores_seed{seed}.parquet"
             expected_score = {
                 "score_schema_version": SCORE_SCHEMA_VERSION,
                 "provenance": provenance,
@@ -1011,7 +1236,7 @@ def run_fold(
         for model in models:
             best = tuning[model]["best"]
             for seed in seeds:
-                score_path = out_dir / model / fold.name / f"scores_seed{seed}.parquet"
+                score_path = _fold_dir(out_dir, model, fold, sealed) / f"scores_seed{seed}.parquet"
                 if score_path.exists():
                     continue
                 print(f"[{model}] {fold.name}: final fit seed={seed} params={best['params']}", flush=True)
@@ -1047,10 +1272,31 @@ def run_fold(
         del outer_train, outer_valid
         gc.collect()
 
+    if sealed:
+        del state
+        gc.collect()
+        elapsed = time.perf_counter() - started
+        for model in models:
+            model_dir = _fold_dir(out_dir, model, fold, sealed)
+            report = _publish_seal(
+                model_dir, model, fold, seeds, config,
+                config_sha, config_path, provenance, tuning[model]["best"]["params"], elapsed,
+            )
+            print(
+                f"[{model}] {fold.name}: compute-only scores published "
+                f"({report['dir']}); audit clean={report['clean']}",
+                flush=True,
+            )
+            if append_ledger:
+                _append_ledger_line(fold, model, model_dir, seeds)
+        _check_memory(config, f"{fold.name} complete")
+        print(f"[{fold.name}] elapsed {elapsed / 60.0:.1f} min", flush=True)
+        return
+
     labels, label_sha = _load_labels(fold)
     for model in models:
         _fold_result(
-            model, fold, out_dir / model / fold.name, labels, label_sha,
+            model, fold, _fold_dir(out_dir, model, fold, sealed), labels, label_sha,
             seeds, tuning[model]["best"], config_sha, provenance,
         )
     del state, labels
@@ -1074,7 +1320,7 @@ def summarize(out_dir: Path, config: dict[str, Any], config_sha: str) -> dict[st
         fold_summaries: dict[str, Any] = {}
         ensemble_daily: list[pd.DataFrame] = []
         seed_daily: dict[int, list[pd.DataFrame]] = {seed: [] for seed in seeds}
-        for fold in FOLDS:
+        for fold in ACTIVE_FOLDS:
             model_dir = out_dir / model / fold.name
             summary_path = model_dir / "fold_summary.json"
             if not summary_path.exists():
@@ -1106,7 +1352,7 @@ def summarize(out_dir: Path, config: dict[str, Any], config_sha: str) -> dict[st
                 if _sha256(daily_path) != fold_summary["seed_daily_ic_sha256"][str(seed)]:
                     raise RuntimeError(f"Seed daily-IC fingerprint mismatch: {daily_path}")
                 seed_daily[seed].append(pd.read_parquet(daily_path))
-        if len(fold_summaries) != len(FOLDS):
+        if len(fold_summaries) != len(ACTIVE_FOLDS):
             continue
         all_daily = pd.concat(ensemble_daily, ignore_index=True).sort_values("signal_date")
         expected = int(config["evaluation"]["expected_daily_ic_count"])
@@ -1152,26 +1398,81 @@ def _parse_csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
+def _seal_cache(cache_dir: Path, config: dict[str, Any], config_sha: str) -> None:
+    """The per-year feature cache carries the training target ``y``.
+
+    The 2026-09-05 authorisation allows the target to be consumed as a training
+    objective but forbids leaving it in readable form, so the cache directory
+    gets its own sentinel and the read guard covers everything beneath it.
+    """
+    write_seal(
+        cache_dir,
+        {
+            "artifact": "per-year stock feature cache plus the shared JKP state table",
+            "why_sealed": (
+                "stock_features_<year>.parquet carries the column y, the "
+                "cross-sectionally demeaned six-session forward return used as the "
+                "training target; it is an input to training only and must not be "
+                "read, plotted or aggregated"
+            ),
+            "config_sha256": config_sha,
+            "jkp_snapshot": config["features"]["jkp_state_snapshot"],
+            "jkp_snapshot_sha256": config["features"]["jkp_state_snapshot_sha256"],
+            "years": sorted(
+                int(path.stem.rsplit("_", 1)[1])
+                for path in (cache_dir / "base").glob("stock_features_*.parquet")
+            ),
+        },
+    )
+
+
 def main() -> None:
+    global ACTIVE_FOLDS
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--cache-dir", type=Path, default=None)
     parser.add_argument("--models", default="lightgbm,xgboost,catboost")
-    parser.add_argument("--folds", default=",".join(fold.name for fold in FOLDS))
+    parser.add_argument("--folds", default=None)
+    parser.add_argument(
+        "--folds-json", type=Path, default=None,
+        help="fold table produced by scripts/emit_folds.py; replaces the seven "
+             "frozen development folds",
+    )
+    parser.add_argument(
+        "--sealed", action="store_true",
+        help="compute-only mode: train and score, load no label, compute no metric",
+    )
+    parser.add_argument(
+        "--append-ledger", action="store_true",
+        help="append one metric-free sealed-compute row per published fold",
+    )
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--summarize-only", action="store_true")
     args = parser.parse_args()
 
+    if args.folds_json is not None:
+        ACTIVE_FOLDS = _load_folds_json(args.folds_json)
+    if args.sealed and args.folds_json is None:
+        raise ValueError("--sealed needs --folds-json from scripts/emit_folds.py")
+    if args.sealed and args.summarize_only:
+        raise ValueError("--summarize-only computes metrics and is refused in compute-only mode")
+
     config, config_sha = _read_config(args.config)
     _check_runtime_versions(config)
     out_dir = args.out_dir.resolve()
-    cache_dir = out_dir / "cache"
-    _freeze_preregister(args.config, out_dir)
+    cache_dir = (args.cache_dir.resolve() if args.cache_dir else out_dir / "cache")
+    _freeze_preregister(
+        args.config, out_dir,
+        "preregister_sealed.json" if args.sealed else "preregister.json",
+    )
     if args.summarize_only:
         print(json.dumps(summarize(out_dir, config, config_sha), indent=2, ensure_ascii=False))
         return
     prepare_caches(cache_dir, config, config_sha)
+    if args.sealed:
+        _seal_cache(cache_dir, config, config_sha)
     if args.prepare_only:
         return
     if args.smoke:
@@ -1183,14 +1484,40 @@ def main() -> None:
     unknown_models = sorted(set(models) - set(config["models"]))
     if unknown_models:
         raise ValueError(f"Models not in frozen config: {unknown_models}")
-    fold_names = set(_parse_csv(args.folds))
-    selected_folds = [fold for fold in FOLDS if fold.name in fold_names]
+    fold_names = set(
+        _parse_csv(args.folds) if args.folds
+        else [fold.name for fold in ACTIVE_FOLDS]
+    )
+    selected_folds = [fold for fold in ACTIVE_FOLDS if fold.name in fold_names]
     if len(selected_folds) != len(fold_names):
-        raise ValueError(f"Unknown folds: {sorted(fold_names - {fold.name for fold in FOLDS})}")
+        known = {fold.name for fold in ACTIVE_FOLDS}
+        raise ValueError(f"Unknown folds: {sorted(fold_names - known)}")
     _check_packages(models)
+    seeds_from_config = [int(value) for value in config["seeds"]]
     for fold in selected_folds:
+        if args.sealed:
+            done = all(
+                (_fold_dir(out_dir, model, fold, True) / "SEALED_MANIFEST.json").exists()
+                for model in models
+            )
+            if done:
+                print(f"[{fold.name}] already published, skipping", flush=True)
+                if args.append_ledger:
+                    for model in models:
+                        _append_ledger_line(
+                            fold, model, _fold_dir(out_dir, model, fold, True), seeds_from_config
+                        )
+                continue
+            run_fold(
+                fold, models, out_dir, cache_dir, config, config_sha,
+                sealed=True, config_path=args.config, append_ledger=args.append_ledger,
+            )
+            continue
         run_fold(fold, models, out_dir, cache_dir, config, config_sha)
         summarize(out_dir, config, config_sha)
+    if args.sealed:
+        print("[done] compute-only run finished; reading these scores needs a separate grant", flush=True)
+        return
     print(json.dumps(summarize(out_dir, config, config_sha), indent=2, ensure_ascii=False))
 
 
