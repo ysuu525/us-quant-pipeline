@@ -134,15 +134,22 @@ def ridge(Xtr, ytr, Xva, alpha):
     return RidgeFit(Xtr, ytr).predict(Xva, alpha)
 
 
-def daily_ic(pred, y, day):
-    out = []
+def daily_ic_series(pred, y, day):
+    """逐日 RankIC 序列。与 daily_ic 完全同一套算法（同一份代码），
+    只是把中间量交出来，供 --daily-ic-dir 落盘。默认不调用，不改任何读数。"""
+    days, out = [], []
     for u in np.unique(day):
         k = day == u
         if k.sum() < 50:
             continue
+        days.append(u)
         out.append(np.corrcoef(np.argsort(np.argsort(pred[k])).astype(float),
                                np.argsort(np.argsort(y[k])).astype(float))[0, 1])
-    v = np.asarray(out, dtype=float)
+    return np.asarray(days, dtype=np.int64), np.asarray(out, dtype=float)
+
+
+def daily_ic(pred, y, day):
+    _, v = daily_ic_series(pred, y, day)
     n = len(v)
     e = v - v.mean()
     var = float(e @ e) / n
@@ -162,6 +169,10 @@ def main():
     ap.add_argument("--out-json", default="outputs/ridge_probe.json")
     ap.add_argument("--folds", default="", help="逗号分隔的折名；留空=全部。"
                     "用于把已缓存的折先跑出来，未缓存的等 GPU 空出来再补")
+    ap.add_argument("--daily-ic-dir", default="",
+                    help="可选：把**内层选定 alpha** 的外层逐日 RankIC 序列落盘到该"
+                         "目录（每折一个 parquet）。留空=不落盘，输出与既有产物逐位"
+                         "一致。仅供实验 8 汇总表算 NW(5) t 用，不参与选参。")
     args = ap.parse_args()
 
     P = Path(args.processed)
@@ -241,6 +252,14 @@ def main():
                          "oracle_rank_ic": float(oracle)}
         log(f"  → 选定 alpha={picked[0]:.0e}：外层 RankIC {picked[1]:+.5f} "
             f"(t {picked[2]:+.2f})　[事后最优上界 {oracle:+.5f}]")
+        if args.daily_ic_dir:
+            ddir = Path(args.daily_ic_dir)
+            ddir.mkdir(parents=True, exist_ok=True)
+            dd, vv = daily_ic_series(fit_out.predict(Xva, picked[0]), yva, dva)
+            pd.DataFrame({"signal_date": pd.to_datetime(dd, unit="D"),
+                          "rank_ic": vv}).to_parquet(ddir / f"{name}.parquet",
+                                                     index=False)
+            log(f"  逐日 RankIC 序列已落盘 {ddir / (name + '.parquet')}（{len(vv)} 天）")
         del Xtr, Xva, E_tr, E_va, m_tr, m_va
 
     vals = [r["rank_ic"] for r in results.values()]
