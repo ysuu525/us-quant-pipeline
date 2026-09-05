@@ -26,6 +26,13 @@
 ``daily_ic.parquet``、``daily_money.parquet``、``scores.parquet``（分数副本，
 供 H1b / H6 取用，使它们不必知道封存目录）、``verify.json``（口径核对事实）。
 
+读取前剔除（v4.1 附录 §5）
+--------------------------
+``fold35``（表 B，止于 2020-07-02）与开发 ``fold36``（表 A，起于 2020-07-01）重叠
+**2 个交易日**，这两个信号日在开发阶段已被读过。本模块在**标签计算之前**把
+:data:`unseal.folds.EXCLUDED_SIGNAL_DATES` 从该折分数中剔除，使折 05–35 严格为
+「未消耗」；剔除行数写进 ``metrics.json`` 的 ``n_rows_excluded``。**只作用于 fold35。**
+
 无前视自查（`CLAUDE.md` §一.1）
 -------------------------------
 ``label`` 只出现在两处：``compute_labels`` 的产物，以及 RankIC / 十分位价差的
@@ -58,7 +65,7 @@ from crsp_pipeline.signal_eval import (
 
 from . import config as C
 from . import paths as P
-from .folds import FoldWindow
+from .folds import EXCLUDED_SIGNAL_DATES, FoldWindow, excluded_dates_for
 
 __all__ = ["run_fold", "fold_out_dir"]
 
@@ -144,6 +151,16 @@ def run_fold(processed: Path, outputs_root: Path, window: FoldWindow, arm: str,
     scores = pd.read_parquet(scores_path, columns=["PERMNO", "signal_date", "score"])
     scores["signal_date"] = pd.to_datetime(scores["signal_date"])
     scores = scores.dropna(subset=["score"])
+
+    # ---- v4.1 附录 §5：剔除表 A / 表 B 唯一重叠处的两个信号日（只作用于 fold35）。
+    #      **在标签计算之前**剔除，故 H1 / H2 / H2-era / H3 / H6 / E 全部统计一致地不含它们。
+    drop = excluded_dates_for(window.fold)
+    n_excluded = 0
+    if drop:
+        mask = scores["signal_date"].isin(drop)
+        n_excluded = int(mask.sum())
+        scores = scores.loc[~mask].reset_index(drop=True)
+
     # 分数副本：下游（H1b / H6）只读这棵未封存的输出树，不必知道封存目录。
     scores.to_parquet(dst / "scores.parquet", index=False)
 
@@ -225,6 +242,10 @@ def run_fold(processed: Path, outputs_root: Path, window: FoldWindow, arm: str,
         # 当日 ADV 口径，**只作诊断、不进 H2**
         "ic_by_adv_quintile": _stratified_ic(df, "ADV20"),
         "n_money_days": int(len(money)),
+        "excluded_signal_dates": sorted(str(d.date()) for d in drop),
+        "n_rows_excluded": n_excluded,
+        "excluded_rule": ("v4.1 附录 §5：表 B 的 fold35 与表 A 的开发 fold36 重叠 "
+                          "2 个交易日，已在标签计算之前剔除") if drop else None,
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     (dst / "metrics.json").write_text(
@@ -237,5 +258,7 @@ def run_fold(processed: Path, outputs_root: Path, window: FoldWindow, arm: str,
         "n_money_days": metrics["n_money_days"],
         "n_delta_days": int(delta["delta_adv"].notna().sum()),
         "label_ok_share": ok_share,
+        "n_rows_excluded": n_excluded,
+        "excluded_signal_dates": sorted(str(d.date()) for d in drop),
         "verify": verify,
     }

@@ -47,7 +47,7 @@ from crsp_pipeline.signal_eval import _spearman
 from . import config as C
 from . import paths as P
 from .aggregate import _sign_counts, nw_interval
-from .folds import FoldWindow
+from .folds import FoldWindow, excluded_dates_for
 from .perfold import fold_out_dir
 
 __all__ = ["verify_tree_folds", "daily_paired_ic", "h3_summary", "run_h3"]
@@ -127,6 +127,7 @@ def run_h3(outputs_root: Path, out_root: Path, windows: Sequence[FoldWindow],
     verified = verify_tree_folds(outputs_root, ordered)
 
     parts = []
+    n_tree_excluded = 0
     for w in ordered:
         kdir = fold_out_dir(out_root, arm, w.fold)
         kronos = pd.read_parquet(kdir / "scores.parquet",
@@ -138,6 +139,12 @@ def run_h3(outputs_root: Path, out_root: Path, windows: Sequence[FoldWindow],
         tree = pd.read_parquet(tpath, columns=["PERMNO", "signal_date", "score"])
         for frame in (kronos, labels, tree):
             frame["signal_date"] = pd.to_datetime(frame["signal_date"])
+        # v4.1 附录 §5：树基线一侧显式同样剔除（Kronos 侧在 perfold 已剔除；
+        # 这里不靠 inner join 顺带生效，而是明写，免得日后改 join 方式失效）。
+        drop = excluded_dates_for(w.fold)
+        if drop:
+            n_tree_excluded += int(tree["signal_date"].isin(drop).sum())
+            tree = tree.loc[~tree["signal_date"].isin(drop)]
         d = daily_paired_ic(kronos, tree, labels)
         d["fold"] = w.fold
         parts.append(d)
@@ -150,4 +157,5 @@ def run_h3(outputs_root: Path, out_root: Path, windows: Sequence[FoldWindow],
     daily.to_parquet(out_dir / "daily_paired_ic.parquet", index=False)
     summary = h3_summary(daily)
     summary["caliber_check"] = verified
+    summary["n_tree_rows_excluded"] = n_tree_excluded
     return summary

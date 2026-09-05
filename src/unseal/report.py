@@ -408,6 +408,10 @@ def render_report(payload: dict[str, Any], *, title: str, scope: str,
         f"工作树 porcelain 行数 {meta.get('git_porcelain_lines', '未核')}",
         f"- 配置哈希：`{meta.get('config_sha256', '未核')}`；"
         f"代码快照哈希：`{meta.get('code_sha256_of_snapshot', '未核')}`",
+        f"- **按 v4.1 §5 剔除 fold35 两个信号日**"
+        f"（{'、'.join(sorted(meta.get('excluded_signal_dates', [])) ) or '未核'}，"
+        f"与开发折表的唯一重叠处；FT 与树基线两侧、标签计算之前剔除），"
+        f"**剔除行数 {meta.get('n_rows_excluded', '未核')}**",
         f"- 口径核对：{meta.get('n_verified', 0)} 个（折 × 臂）全部通过 "
         "`scores_sha256` 与 config 五项（lookback 90 / predict 6 / sample_count 5 / "
         "amp bf16 / batch_size 128）",

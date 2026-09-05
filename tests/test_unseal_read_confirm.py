@@ -41,7 +41,7 @@ from unseal.paths import (  # noqa: E402
     sealed_eval_dir,
     verify_fold,
 )
-from unseal.perfold import _delta_adv_daily  # noqa: E402
+from unseal.perfold import _delta_adv_daily, fold_out_dir  # noqa: E402
 from unseal.report import render_report  # noqa: E402
 from unseal.smoke import build_workspace  # noqa: E402
 
@@ -49,7 +49,7 @@ ENTRY = REPO / "scripts" / "unseal_read_confirm.py"
 LEDGER = REPO / "experiments" / "ledger.md"
 UNSEAL_SOURCES = [ENTRY] + sorted((REPO / "src" / "unseal").glob("*.py"))
 
-SMOKE_FOLDS = (5, 21)          # 一早一晚，跨 2013-01-01 的年代切点
+SMOKE_FOLDS = (5, 21, 35)      # 一早两晚，跨年代切点；fold35 触发 v4.1 §5 剔除
 SMOKE_PERMNOS = 120
 SMOKE_ARMS = C.ARMS_DEFAULT          # v4.1 附录：默认只读 FT
 PROCESSED = Path(r"F:\quant\processed\crsp_ciz_2026-08-24_20260825T130601Z")
@@ -292,8 +292,9 @@ def test_no_arm_difference_key_anywhere(smoke_run):
         assert not bad, f"{rel} 出现臂间差值键: {bad}"
 
 
-#: 报告里唯一允许出现折号的地方：v4 §2.5.1 强制披露的年代归段边界事实。
-_ALLOWED_FOLD_MENTION = ("边界事实", "归段")
+#: 报告里允许出现折号的**两处**（都是协议强制披露，且都不带读数）：
+#: v4 §2.5.1 的年代归段边界事实、v4.1 §5 的 fold35 剔除。
+_ALLOWED_FOLD_MENTION = ("边界事实", "归段", "剔除")
 
 
 def _fold_mentions(text: str) -> list[str]:
@@ -596,3 +597,76 @@ def test_h3_summary_is_estimate_only_and_discloses_the_worse_power(smoke_run):
     assert len(h3["caliber_check"]) == len(SMOKE_FOLDS)
     for row in h3["caliber_check"]:
         assert row["scores_sha256_checked"] is True
+
+
+# ------------------------------------------------------------------ v4.1 §5 剔除
+
+def test_excluded_signal_dates_only_touch_fold35(smoke_run):
+    """v4.1 附录 §5：只剔 fold35 的那两个信号日，其余折一行不动。"""
+    from unseal.folds import EXCLUDED_SIGNAL_DATES, EXCLUDED_SIGNAL_DATES_FOLD
+
+    assert EXCLUDED_SIGNAL_DATES == frozenset({"2020-07-01", "2020-07-02"})
+    assert EXCLUDED_SIGNAL_DATES_FOLD == 35
+    out = smoke_run["out"]
+    dropped = {pd.Timestamp(d) for d in EXCLUDED_SIGNAL_DATES}
+
+    total = 0
+    for f in SMOKE_FOLDS:
+        d = fold_out_dir(out, "ft", f)
+        metrics = json.loads((d / "metrics.json").read_text(encoding="utf-8"))
+        scores = pd.read_parquet(d / "scores.parquet")
+        labels = pd.read_parquet(d / "labels.parquet")
+        ic = pd.read_parquet(d / "daily_ic.parquet")
+        for frame in (scores, labels, ic):
+            frame["signal_date"] = pd.to_datetime(frame["signal_date"])
+        if f == EXCLUDED_SIGNAL_DATES_FOLD:
+            # 这两天本来落在 fold35 的验证窗内，剔除后一行不剩
+            assert metrics["n_rows_excluded"] > 0
+            assert metrics["excluded_signal_dates"] == sorted(EXCLUDED_SIGNAL_DATES)
+            total += metrics["n_rows_excluded"]
+        else:
+            assert metrics["n_rows_excluded"] == 0
+            assert metrics["excluded_signal_dates"] == []
+        # 无论哪一折，产物里都不许出现这两个信号日（标签、IC 也一并不含）
+        for frame, name in ((scores, "scores"), (labels, "labels"), (ic, "daily_ic")):
+            assert not frame["signal_date"].isin(dropped).any(), f"fold{f:02d}/{name}"
+
+    assert total > 0
+    summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    assert summary["n_rows_excluded"] == total
+    assert summary["excluded_signal_dates"] == sorted(EXCLUDED_SIGNAL_DATES)
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["excluded_signal_dates"] == sorted(EXCLUDED_SIGNAL_DATES)
+    assert meta["excluded_signal_dates_fold"] == 35
+    assert (meta["frozen_config"]["excluded_signal_dates"]["dates"]
+            == sorted(EXCLUDED_SIGNAL_DATES))
+    head = (out / "report.md").read_text(encoding="utf-8")[:2500]
+    assert "v4.1 §5" in head and f"剔除行数 {total}" in head
+
+
+def test_fold35_scores_would_otherwise_contain_the_excluded_days(smoke_run):
+    """反证：封存分数本身有这两天，剔除不是「本来就没有」。"""
+    from unseal import paths as UP
+    from unseal.folds import EXCLUDED_SIGNAL_DATES
+
+    sealed = UP.sealed_scores_path(
+        35, "ft", smoke_run["out"] / "_smoke_workspace" / "outputs")
+    raw = pd.read_parquet(sealed, columns=["PERMNO", "signal_date"])
+    raw["signal_date"] = pd.to_datetime(raw["signal_date"])
+    hit = raw["signal_date"].isin({pd.Timestamp(d) for d in EXCLUDED_SIGNAL_DATES})
+    assert int(hit.sum()) > 0
+    metrics = json.loads(
+        (fold_out_dir(smoke_run["out"], "ft", 35) / "metrics.json").read_text(
+            encoding="utf-8"))
+    assert metrics["n_rows_excluded"] == int(hit.sum())
+
+
+def test_h3_excludes_the_same_days_on_the_tree_side(smoke_run):
+    s = json.loads((smoke_run["out"] / "summary.json").read_text(encoding="utf-8"))
+    assert s["h3"]["n_tree_rows_excluded"] > 0
+    daily = pd.read_parquet(
+        smoke_run["out"] / "h3_tree_paired" / "daily_paired_ic.parquet")
+    daily["signal_date"] = pd.to_datetime(daily["signal_date"])
+    from unseal.folds import EXCLUDED_SIGNAL_DATES
+    assert not daily["signal_date"].isin(
+        {pd.Timestamp(d) for d in EXCLUDED_SIGNAL_DATES}).any()

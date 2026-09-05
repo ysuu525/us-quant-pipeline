@@ -34,8 +34,10 @@ from .folds import fold_windows, load_calendar
 
 __all__ = ["build_workspace", "DEFAULT_SMOKE_FOLDS"]
 
-#: 两早两晚，跨 2013-01-01 的年代切点，够 G4 跑出两段。
-DEFAULT_SMOKE_FOLDS: tuple[int, ...] = (5, 6, 21, 22)
+#: 一早两晚，跨 2013-01-01 的年代切点（够 G4 跑出两段），并**必含 fold35**——
+#: 合成日历复现了它的真实窗口 2020-01-03..2020-07-02，故 v4.1 附录 §5 的两个
+#: 剔除日（2020-07-01、2020-07-02）在冒烟里真的会出现，剔除逻辑被实跑到。
+DEFAULT_SMOKE_FOLDS: tuple[int, ...] = (5, 21, 35)
 CALENDAR_START = "2000-01-03"
 #: 一直造到 2026-01-02，使机械滚动规则也能产出 fold44–45（干净窗），
 #: 让 ``--clean-window`` 的独立交付路径在冒烟里也真的跑一遍。

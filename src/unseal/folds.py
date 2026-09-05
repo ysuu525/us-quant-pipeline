@@ -8,6 +8,21 @@
 用途限制：本模块只产生**窗口边界**，不读任何分数、标签或收益；生成的窗口随后
 由 :func:`unseal.paths.verify_fold` 与封存清单的 ``val_window`` 逐折对账，
 对不上即中止整个运行。
+
+**仓库内并存两张折表，不可混用**（v4.1 附录 §5；登记簿 2026-09-05 ``open-issue``）
+---------------------------------------------------------------------------------
+* **表 B = ``CONFIRM_FOLDS``（本包用的这张）**：``walk_forward_folds(cal,
+  "2000-01-03", …)``，即 ``scripts/emit_folds.py:34`` 那一条。封存确认集的**全部**
+  产物按此：Kronos FT 封存 fold05 val 2005-01-03..2005-07-01、fold35 ..2020-07-02、
+  fold44 2024-07-03..2025-01-02；XGBoost 树基线封存同表。
+* **表 A = ``DEV_FOLDS``（本包不用）**：``walk_forward_folds(cal, "2000-01-01", …)``，
+  开发折 36–42 的全部 Kronos 产物、``gbdt_baseline.py::FOLDS``、
+  ``ridge_probe_folds.py::FOLDS``、HANDOFF 的「42 折」按此。
+
+**两表不可混用**：同一折号在两表下的窗口相差 1–3 个交易日。封存集内部一致
+（FT 与树基线都按表 B），故 H3 配对不错位；本轮**不改** ``scripts/emit_folds.py``。
+
+两表交界处的一项剔除见 :data:`EXCLUDED_SIGNAL_DATES`。
 """
 from __future__ import annotations
 
@@ -20,9 +35,32 @@ import pandas as pd
 from crsp_pipeline.calendar import TradingCalendar
 from crsp_pipeline.splits import walk_forward_folds
 
-__all__ = ["FoldWindow", "load_calendar", "fold_windows", "parse_folds", "era_of"]
+__all__ = ["FoldWindow", "load_calendar", "fold_windows", "parse_folds", "era_of",
+           "EXCLUDED_SIGNAL_DATES", "EXCLUDED_SIGNAL_DATES_FOLD",
+           "excluded_dates_for"]
 
-_EMIT_START = "2000-01-03"   # 与 scripts/emit_folds.py 逐字一致
+_EMIT_START = "2000-01-03"   # 表 B：与 scripts/emit_folds.py:34 逐字一致
+_DEV_START = "2000-01-01"    # 表 A：开发折 36–42 用的那张，**本包不用**
+
+#: v4.1 附录 §5 第 2 条的读取前剔除。
+#:
+#: 表 B 的 **fold35 止于 2020-07-02**，与表 A 的开发 **fold36 起于 2020-07-01**
+#: 重叠 **2 个交易日**；这两个信号日的 Kronos 分数与标签**在开发阶段已被读取**。
+#: 为使折 05–35 严格为「未消耗」，读取时把它们从 **fold35** 的一切统计中剔除
+#: （H1 / H2 / H2-era / H3 / H6 / E 全部，且在标签计算之前就剔除），
+#: **FT 与树基线两侧同样剔除**。影响约 2/3900 日，量级可忽略，纯度优先。
+#:
+#: **只作用于 fold35**：其余折与这两张表的交界无关，不得连带剔除。
+EXCLUDED_SIGNAL_DATES: frozenset[str] = frozenset({"2020-07-01", "2020-07-02"})
+#: 上述剔除只适用于这一折（表 A / 表 B 的唯一重叠处）。
+EXCLUDED_SIGNAL_DATES_FOLD: int = 35
+
+
+def excluded_dates_for(fold: int) -> frozenset[pd.Timestamp]:
+    """该折需要剔除的信号日（v4.1 附录 §5）。非 fold35 一律为空集。"""
+    if int(fold) != EXCLUDED_SIGNAL_DATES_FOLD:
+        return frozenset()
+    return frozenset(pd.Timestamp(d) for d in EXCLUDED_SIGNAL_DATES)
 
 
 @dataclass(frozen=True)

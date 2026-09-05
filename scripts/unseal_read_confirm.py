@@ -47,6 +47,12 @@
   成本网格 2/4/8/12/16/22bp；部署线 ``C ≤ BE_dev × (1 − h) − 6bp`` **只报不判**
   （**h = 0.42 主判** → FT ``C ≤ 7.28bp``、ZS ``C ≤ 3.51bp``；敏感性
   h ∈ [0.399, 0.440]；旧线 ``×0.75`` **已作废，只作一行对照披露**）。
+* **读取前剔除（v4.1 附录 §5）**：表 B 的 ``fold35``（止于 2020-07-02）与表 A 的
+  开发 ``fold36``（起于 2020-07-01）重叠 **2 个交易日**（2020-07-01、2020-07-02），
+  这两个信号日在开发阶段已被读过。读取时从 **fold35** 的一切统计中剔除
+  （FT 与树基线两侧，且**在标签计算之前**），使折 05–35 严格为「未消耗」；
+  剔除行数写进 ``run_meta.json`` / ``summary.json`` 与报告页头。
+
 * **H3 不在本次范围**（树基线需封存窗内标签作训练目标，超出 2026-09-01 计算授权）；
   **H4 空置**（信号 #2 未过准入，`ledger:477`）。
 
@@ -84,7 +90,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from unseal import aggregate, config as C, h1b as H1B, h3 as H3, h6 as H6, paths as UP  # noqa: E402
-from unseal.folds import fold_windows, load_calendar, parse_folds  # noqa: E402
+from unseal.folds import (  # noqa: E402
+    EXCLUDED_SIGNAL_DATES, EXCLUDED_SIGNAL_DATES_FOLD,
+    fold_windows, load_calendar, parse_folds,
+)
 from unseal.perfold import run_fold  # noqa: E402
 from unseal.report import render_report  # noqa: E402
 
@@ -143,6 +152,14 @@ def frozen_config_snapshot() -> dict:
         "h1_dev_base": C.H1_DEV_BASE,
         "h1_main_prediction": {k: list(v) for k, v in C.H1_MAIN_PREDICTION.items()},
         "h1_sensitivity_prediction": list(C.H1_SENSITIVITY_PREDICTION),
+        "excluded_signal_dates": {
+            "dates": sorted(EXCLUDED_SIGNAL_DATES),
+            "fold": EXCLUDED_SIGNAL_DATES_FOLD,
+            "rule": ("v4.1 附录 §5：表 B 的 fold35（止于 2020-07-02）与表 A 的开发 "
+                     "fold36（起于 2020-07-01）重叠 2 个交易日，这两个信号日在开发阶段"
+                     "已被读过；读取时从 fold35 的一切统计中剔除（FT 与树基线两侧），"
+                     "且在标签计算之前剔除，使折 05–35 严格为「未消耗」"),
+        },
         "era": {"cut": C.ERA_CUT,
                 "early_folds": list(C.ERA_EARLY_FOLDS),
                 "late_folds": list(C.ERA_LATE_FOLDS),
@@ -262,9 +279,17 @@ def run_scope(*, scope_name: str, folds: tuple[int, ...], out: Path,
                 f"{time.perf_counter() - t0:.1f}s")
 
     # ---- 阶段 2：合并统计（两臂各一份，**不算任何差值**）
-    payload: dict = {"run_meta": run_meta | {"n_verified": len(verified)},
+    n_excluded = sum(int(x.get("n_rows_excluded", 0)) for x in per_fold)
+    log(f"[{scope_name}] v4.1 §5 剔除：{n_excluded} 行"
+        f"（信号日 {sorted(EXCLUDED_SIGNAL_DATES)}，只作用于 "
+        f"fold{EXCLUDED_SIGNAL_DATES_FOLD:02d}）")
+    payload: dict = {"run_meta": run_meta | {"n_verified": len(verified),
+                                             "n_rows_excluded": n_excluded},
                      "scope": scope_name, "folds_count": len(folds),
                      "arms": list(arms),
+                     "excluded_signal_dates": sorted(EXCLUDED_SIGNAL_DATES),
+                     "excluded_signal_dates_fold": EXCLUDED_SIGNAL_DATES_FOLD,
+                     "n_rows_excluded": n_excluded,
                      "h1": {}, "h2": {}, "h2_era": {}, "e": {}}
     for arm in arms:
         ic = aggregate.load_daily(out, arm, folds, "daily_ic")
@@ -396,7 +421,11 @@ def main() -> int:
     t0 = time.perf_counter()
     run_meta = build_run_meta(out, args) | {"authorisation_ref": authorisation,
                                         "arms_read": list(arms),
-                                        "zs_dropped": "zs" not in arms}
+                                        "zs_dropped": "zs" not in arms,
+                                        "excluded_signal_dates":
+                                            sorted(EXCLUDED_SIGNAL_DATES),
+                                        "excluded_signal_dates_fold":
+                                            EXCLUDED_SIGNAL_DATES_FOLD}
     (out / "run_meta.json").write_text(
         json.dumps(run_meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
